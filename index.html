@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#081522">
+  <meta name="description" content="AeroFresh environmental monitoring and food-storage risk analytics prototype.">
+  <title>AeroFresh — Environmental Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#overview" aria-label="AeroFresh home">
+        <span class="brand-mark"><svg viewBox="0 0 48 48" role="img" aria-label="AeroFresh leaf circuit logo"><path d="M38 8C22 8 11 14 10 27c-.5 7 4 12 11 12 13 0 18-15 17-31Z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M9 40c7-10 14-15 25-23M21 30l-1-8m8 1 6 1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="20" cy="22" r="2" fill="currentColor"/><circle cx="35" cy="23" r="2" fill="currentColor"/></svg></span>
+        <span><strong>AeroFresh</strong><small>ENVIRONMENTAL INTELLIGENCE</small></span>
+      </a>
+      <div class="workspace-label">WORKSPACE</div>
+      <nav class="nav-list" aria-label="Main navigation">
+        <a class="nav-link active" href="#overview" data-section="overview"><i data-lucide="layout-dashboard"></i><span>Overview</span></a>
+        <a class="nav-link" href="#monitoring" data-section="monitoring"><i data-lucide="activity"></i><span>Live Monitoring</span><span class="nav-live"></span></a>
+        <a class="nav-link" href="#analytics" data-section="analytics"><i data-lucide="chart-no-axes-combined"></i><span>Historical Analytics</span></a>
+        <a class="nav-link" href="#anomalies" data-section="anomalies"><i data-lucide="scan-search"></i><span>Anomaly Detection</span></a>
+        <a class="nav-link" href="#risk" data-section="risk"><i data-lucide="shield-alert"></i><span>Risk Analysis</span></a>
+        <a class="nav-link" href="#assistant" data-section="assistant"><i data-lucide="messages-square"></i><span>Ask AeroFresh</span></a>
+        <a class="nav-link" href="#system" data-section="system"><i data-lucide="cpu"></i><span>System Information</span></a>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="device-mini">
+          <div class="device-mini-top"><span class="status-dot demo-dot"></span><span>DEMO ENVIRONMENT</span></div>
+          <strong>ESP32 DevKit</strong>
+          <small>Hardware connection pending</small>
+          <div class="device-progress"><span></span></div>
+          <small class="progress-caption">Simulation mode active</small>
+        </div>
+        <div class="profile-row"><div class="avatar">AF</div><div><strong>Project workspace</strong><small>Prototype v0.1</small></div><i data-lucide="more-horizontal"></i></div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="icon-btn menu-toggle" id="menuToggle" aria-label="Open navigation" aria-expanded="false"><i data-lucide="menu"></i></button>
+        <div class="breadcrumb"><span>Workspace</span><i data-lucide="chevron-right"></i><strong id="pageCrumb">Overview</strong></div>
+        <div class="topbar-actions">
+          <div class="mode-pill"><span class="status-dot demo-dot"></span><span>DEMO MODE</span></div>
+          <button class="icon-btn" id="refreshBtn" aria-label="Refresh demo data" title="Refresh demo data"><i data-lucide="refresh-cw"></i></button>
+          <div class="top-date"><span class="date-label">LOCAL TIME</span><strong id="clock">--:--:--</strong></div>
+        </div>
+      </header>
+
+      <div class="content-wrap">
+        <section class="page-section active-section" id="overview">
+          <div class="page-heading">
+            <div><div class="eyebrow"><span class="eyebrow-line"></span> ENVIRONMENTAL INTELLIGENCE</div><h1>Good morning. <span class="gradient-text">Here's your storage overview.</span></h1><p class="subheading">Monitor environmental conditions and explore experimental storage-risk signals.</p></div>
+            <div class="heading-meta"><span class="demo-tag"><i data-lucide="flask-conical"></i> ALL VALUES ARE DEMO DATA</span><span class="updated-label">Last updated <strong id="lastUpdated">—</strong></span></div>
+          </div>
+
+          <div class="hero-strip">
+            <div class="hero-copy"><div class="hero-kicker"><span class="pulse-ring"></span> PROTOTYPE ENVIRONMENT</div><h2>Smarter signals.<br><em>Better storage decisions.</em></h2><p>AeroFresh combines temperature, humidity and gas-response trends to surface unusual environmental patterns before they go unnoticed.</p><a href="#risk" class="text-link">Explore risk analysis <i data-lucide="arrow-up-right"></i></a></div>
+            <div class="hero-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orb-core"><i data-lucide="leaf"></i></div><span class="float-chip chip-temp"><i data-lucide="thermometer"></i> TEMP</span><span class="float-chip chip-humidity"><i data-lucide="droplets"></i> HUMIDITY</span><span class="float-chip chip-gas"><i data-lucide="wind"></i> GAS</span><div class="art-spark spark-a"></div><div class="art-spark spark-b"></div></div>
+            <div class="hero-foot"><span><i data-lucide="wifi"></i> MQTT NOT CONFIGURED</span><span><i data-lucide="shield-check"></i> LOCAL DEMO ONLY</span></div>
+          </div>
+
+          <div class="section-title-row"><div><h2>Sensor snapshot</h2><p>Latest simulated readings from the prototype dataset</p></div><a class="subtle-link" href="#monitoring">View monitoring <i data-lucide="arrow-right"></i></a></div>
+          <div class="sensor-grid" id="sensorCards">
+            <article class="sensor-card"><div class="skeleton"></div></article><article class="sensor-card"><div class="skeleton"></div></article><article class="sensor-card"><div class="skeleton"></div></article><article class="sensor-card"><div class="skeleton"></div></article>
+          </div>
+
+          <div class="overview-grid">
+            <article class="panel trend-panel"><div class="panel-header"><div><h3>Environmental trends</h3><p>Multi-sensor signal overview · synthetic sample</p></div><a href="#analytics" class="icon-link" aria-label="Open analytics"><i data-lucide="arrow-up-right"></i></a></div><div class="chart-legend"><span><b class="legend-dot temp"></b>Temperature</span><span><b class="legend-dot humidity"></b>Humidity</span><span><b class="legend-dot gas"></b>Gas response</span></div><div class="chart-wrap large-chart"><canvas id="combinedChart" aria-label="Combined environmental trends chart"></canvas></div></article>
+            <article class="panel risk-summary"><div class="panel-header"><div><h3>Environmental risk</h3><p>Experimental prototype indicator</p></div><span class="info-icon" title="Not a food-safety measurement"><i data-lucide="info"></i></span></div><div class="gauge-area"><div class="gauge" id="overviewGauge"><div class="gauge-inner"><strong id="overviewRiskScore">—</strong><span> / 100</span><small id="overviewRiskLabel">Calculating</small></div></div></div><div class="risk-foot"><span id="riskStatusDot" class="status-dot"></span><strong id="riskSummaryLabel">Evaluating conditions</strong></div><p class="fine-print">Not a spoilage probability or validated food-safety score.</p><a href="#risk" class="text-link">View methodology <i data-lucide="arrow-right"></i></a></article>
+          </div>
+
+          <div class="bottom-grid">
+            <article class="panel alerts-panel"><div class="panel-header"><div><h3>Recent alerts</h3><p>Illustrative events generated for interface testing</p></div><a href="#anomalies" class="subtle-link">All alerts <i data-lucide="arrow-right"></i></a></div><div id="recentAlerts" class="alert-list"></div></article>
+            <article class="panel system-panel"><div class="panel-header"><div><h3>System at a glance</h3><span class="tiny-badge">PROTOTYPE</span></div><i data-lucide="circuit-board" class="muted-icon"></i></div><div class="system-stats"><div><span>Controller</span><strong>ESP32 DevKit</strong></div><div><span>Transport</span><strong>Wi-Fi · MQTT <small>planned</small></strong></div><div><span>Data mode</span><strong><b class="status-dot demo-dot"></b> Simulated</strong></div></div><a href="#system" class="text-link">System details <i data-lucide="arrow-right"></i></a></article>
+          </div>
+        </section>
+
+        <section class="page-section" id="monitoring">
+          <div class="page-heading compact-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> SENSOR TELEMETRY</div><h1>Live <span class="gradient-text">monitoring</span></h1><p class="subheading">A real-time-ready view powered by a clearly marked local simulation.</p></div><span class="demo-tag"><i data-lucide="flask-conical"></i> DEMO DATA</span></div>
+          <div class="notice-banner"><i data-lucide="info"></i><div><strong>Hardware is not connected.</strong><span>These values are generated locally for demonstration. MQTT connection remains disabled until a broker is configured.</span></div></div>
+          <div class="sensor-grid" id="monitorSensorCards"></div>
+          <div class="monitor-grid">
+            <article class="panel"><div class="panel-header"><div><h3>Temperature</h3><p>DHT22 · degrees Celsius</p></div><span class="unit-chip">°C</span></div><div class="chart-wrap"><canvas id="temperatureChart"></canvas></div></article>
+            <article class="panel"><div class="panel-header"><div><h3>Relative humidity</h3><p>DHT22 · relative humidity</p></div><span class="unit-chip">%</span></div><div class="chart-wrap"><canvas id="humidityChart"></canvas></div></article>
+            <article class="panel"><div class="panel-header"><div><h3>MQ-135 response</h3><p>Raw analog-to-digital reading</p></div><span class="unit-chip">ADC</span></div><div class="chart-wrap"><canvas id="gasChart"></canvas></div></article>
+            <article class="panel particulate-panel"><div class="panel-header"><div><h3>Particulate level</h3><p>GP2Y1014 · planned sensor</p></div><span class="unit-chip">—</span></div><div class="empty-sensor"><div class="empty-icon"><i data-lucide="cloud-fog"></i></div><strong>Sensor not installed</strong><span>Particulate readings will appear here after hardware integration.</span><small>NO DATA AVAILABLE</small></div></article>
+          </div>
+        </section>
+
+        <section class="page-section" id="analytics">
+          <div class="page-heading compact-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> PATTERN EXPLORATION</div><h1>Historical <span class="gradient-text">analytics</span></h1><p class="subheading">Explore generated sample history across selectable time windows.</p></div><span class="demo-tag"><i data-lucide="database"></i> SYNTHETIC HISTORY</span></div>
+          <div class="analytics-toolbar"><div><strong>Time range</strong><span>Update all charts</span></div><div class="range-control" role="group" aria-label="Historical time range"><button class="range-btn active" data-range="1h">1 hour</button><button class="range-btn" data-range="6h">6 hours</button><button class="range-btn" data-range="24h">24 hours</button><button class="range-btn" data-range="7d">7 days</button></div></div>
+          <div class="analytics-grid">
+            <article class="panel analytics-chart"><div class="panel-header"><div><h3>Temperature history</h3><p>Simulated DHT22 readings</p></div><span class="unit-chip">°C</span></div><div class="chart-wrap"><canvas id="historyTempChart"></canvas></div></article>
+            <article class="panel analytics-chart"><div class="panel-header"><div><h3>Humidity history</h3><p>Simulated DHT22 readings</p></div><span class="unit-chip">%</span></div><div class="chart-wrap"><canvas id="historyHumidityChart"></canvas></div></article>
+            <article class="panel analytics-chart"><div class="panel-header"><div><h3>Gas-response history</h3><p>Simulated MQ-135 ADC readings</p></div><span class="unit-chip">ADC</span></div><div class="chart-wrap"><canvas id="historyGasChart"></canvas></div></article>
+            <article class="panel analytics-chart"><div class="panel-header"><div><h3>Combined normalized signals</h3><p>Relative movement · normalized 0–100</p></div><span class="unit-chip">INDEX</span></div><div class="chart-wrap"><canvas id="historyCombinedChart"></canvas></div></article>
+          </div>
+          <article class="panel correlation-panel"><div class="panel-header"><div><h3>Signal relationship explorer</h3><p>Illustrative pairwise correlation from the current synthetic sample</p></div><span class="tiny-badge">DEMO ANALYSIS</span></div><div id="correlationGrid" class="correlation-grid"></div><p class="fine-print">Correlation is descriptive, not evidence of causation. Values are recalculated from the generated demo series.</p></article>
+        </section>
+
+        <section class="page-section" id="anomalies">
+          <div class="page-heading compact-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> EVENT INTELLIGENCE</div><h1>Anomaly <span class="gradient-text">detection</span></h1><p class="subheading">Prototype rules surface unusual patterns for review.</p></div><span class="demo-tag"><i data-lucide="flask-conical"></i> SIMULATED ALERTS</span></div>
+          <div class="notice-banner warning-notice"><i data-lucide="alert-triangle"></i><div><strong>Demo events only.</strong><span>No alert on this page was detected from physical hardware. Rules and thresholds require validation.</span></div></div>
+          <div class="anomaly-summary" id="anomalySummary"></div>
+          <article class="panel"><div class="panel-header"><div><h3>Event timeline</h3><p>Sample alert stream · newest first</p></div><div class="filter-select"><i data-lucide="list-filter"></i><select id="alertFilter" aria-label="Filter alerts"><option value="all">All severities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div></div><div id="allAlerts" class="full-alert-list"></div></article>
+        </section>
+
+        <section class="page-section" id="risk">
+          <div class="page-heading compact-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> EXPERIMENTAL MODEL</div><h1>Risk <span class="gradient-text">analysis</span></h1><p class="subheading">A transparent environmental-condition index — not a food-spoilage prediction.</p></div><span class="demo-tag"><i data-lucide="flask-conical"></i> PROTOTYPE MODEL</span></div>
+          <div class="risk-detail-grid">
+            <article class="panel risk-main-panel"><div class="panel-header"><div><h3>Environmental Risk Indicator — Prototype</h3><p>Illustrative score based on synthetic sensor inputs</p></div><span class="tiny-badge">EXPERIMENTAL</span></div><div class="risk-detail-content"><div class="gauge gauge-large" id="detailGauge"><div class="gauge-inner"><strong id="detailRiskScore">—</strong><span> / 100</span><small id="detailRiskLabel">—</small></div></div><div class="risk-explainer"><span class="eyebrow">CURRENT INTERPRETATION</span><h2 id="detailRiskHeadline">Evaluating conditions</h2><p id="detailRiskText">This score is an experimental environmental indicator and is not a scientifically validated food-spoilage probability or food-safety measurement.</p><div class="risk-scale"><div><b class="scale-dot low"></b><span>0–29 · Low</span></div><div><b class="scale-dot moderate"></b><span>30–59 · Moderate</span></div><div><b class="scale-dot high"></b><span>60–79 · High</span></div><div><b class="scale-dot very-high"></b><span>80–100 · Very high</span></div></div></div></div></article>
+            <article class="panel factor-panel"><div class="panel-header"><div><h3>Contributing signals</h3><p>Illustrative component weights</p></div></div><div id="riskFactors"></div></article>
+          </div>
+          <article class="panel methodology-panel"><div class="panel-header"><div><h3>How the prototype score works</h3><span class="tiny-badge">TRANSPARENT LOGIC</span></div></div><div class="method-grid"><div><span class="method-number">01</span><strong>Temperature deviation</strong><p>Compares the current reading against an illustrative reference band.</p></div><div><span class="method-number">02</span><strong>Humidity deviation</strong><p>Represents sustained moisture conditions using a simple threshold component.</p></div><div><span class="method-number">03</span><strong>Gas-response change</strong><p>Uses relative variation from a rolling baseline, not a gas concentration.</p></div><div><span class="method-number">04</span><strong>Persistence</strong><p>Adds a small contribution when recent conditions remain outside demo bands.</p></div></div><p class="disclaimer"><i data-lucide="alert-circle"></i> The weights and thresholds are illustrative engineering placeholders. Calibrate with real sensor data and validated food-storage studies before drawing operational or food-safety conclusions.</p></article>
+        </section>
+
+        <section class="page-section" id="assistant">
+          <div class="page-heading compact-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> NATURAL-LANGUAGE EXPLORATION</div><h1>Ask <span class="gradient-text">AeroFresh</span></h1><p class="subheading">Explore the sample readings using a local rule-based demo assistant.</p></div><span class="demo-tag"><i data-lucide="bot"></i> DEMO ASSISTANT</span></div>
+          <div class="chat-layout"><article class="panel chat-panel"><div class="chat-header"><div class="assistant-avatar"><i data-lucide="sprout"></i></div><div><strong>AeroFresh assistant</strong><span><b class="status-dot demo-dot"></b> Demo assistant — not connected to an AI model</span></div><button class="icon-btn" id="clearChat" title="Clear conversation" aria-label="Clear conversation"><i data-lucide="trash-2"></i></button></div><div class="chat-messages" id="chatMessages" aria-live="polite"><div class="message assistant-message"><div class="message-avatar"><i data-lucide="sparkles"></i></div><div class="message-body"><p>Hi! I can help you explore the AeroFresh demo dataset. Ask about sensor trends, recent changes or the prototype risk indicator.</p><small>Local demo response · just now</small></div></div></div><div class="suggested-questions"><span>TRY ASKING</span><button>What was the maximum temperature today?</button><button>When did humidity increase?</button><button>Show the last six hours of gas-response data.</button><button>Why did the environmental risk indicator increase?</button><button>Are any sensors reporting unusual values?</button></div><form class="chat-compose" id="chatForm"><label class="sr-only" for="chatInput">Ask AeroFresh a question</label><input id="chatInput" type="text" placeholder="Ask about your environmental data…" autocomplete="off" required><button type="submit" aria-label="Send message"><i data-lucide="send"></i></button></form><div class="chat-disclaimer">Responses are generated locally from demo data. No AI model, API or live database is connected.</div></article><aside class="panel assistant-side"><div class="assistant-side-icon"><i data-lucide="message-circle-question"></i></div><h3>What can I ask?</h3><p>Try questions about the sample data. The local assistant uses simple keyword matching and can be replaced with a secure backend API later.</p><div class="capability"><i data-lucide="thermometer"></i><span>Sensor maxima and latest values</span></div><div class="capability"><i data-lucide="trending-up"></i><span>Trend direction and changes</span></div><div class="capability"><i data-lucide="shield-alert"></i><span>Prototype risk explanation</span></div><div class="capability"><i data-lucide="alert-circle"></i><span>Simulated alert summaries</span></div></aside></div>
+        </section>
+
+        <section class="page-section" id="system">
+          <div class="page-heading compact-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> HARDWARE & ARCHITECTURE</div><h1>System <span class="gradient-text">information</span></h1><p class="subheading">Current project components and planned integration path.</p></div><span class="demo-tag"><i data-lucide="network"></i> INTEGRATION PENDING</span></div>
+          <div class="system-overview"><div class="system-overview-icon"><i data-lucide="cpu"></i></div><div><span class="eyebrow">EDGE CONTROLLER</span><h2>ESP32 DevKit</h2><p>Designed to collect environmental signals and publish telemetry over Wi-Fi using MQTT.</p></div><div class="system-status"><span class="status-dot demo-dot"></span> Not connected</div></div>
+          <div class="component-grid">
+            <article class="panel component-card"><div class="component-icon"><i data-lucide="thermometer"></i></div><div class="component-top"><span class="component-type">SENSOR 01</span><span class="state-pill planned-state">Integration pending</span></div><h3>DHT22</h3><p>Temperature and relative humidity measurement.</p><div class="component-meta"><span>Outputs</span><strong>°C · %RH</strong></div></article>
+            <article class="panel component-card"><div class="component-icon"><i data-lucide="wind"></i></div><div class="component-top"><span class="component-type">SENSOR 02</span><span class="state-pill planned-state">Integration pending</span></div><h3>MQ-135</h3><p>Broad gas-response signal through an analog input. Not a calibrated gas concentration.</p><div class="component-meta"><span>Output</span><strong>Raw ADC</strong></div></article>
+            <article class="panel component-card"><div class="component-icon"><i data-lucide="cloud-fog"></i></div><div class="component-top"><span class="component-type">SENSOR 03</span><span class="state-pill future-state">Planned</span></div><h3>GP2Y1014</h3><p>Optical dust / particulate sensor, planned for a later hardware revision.</p><div class="component-meta"><span>Output</span><strong>Not available</strong></div></article>
+            <article class="panel component-card"><div class="component-icon"><i data-lucide="radio-tower"></i></div><div class="component-top"><span class="component-type">COMMUNICATION</span><span class="state-pill future-state">Planned</span></div><h3>Wi-Fi + MQTT</h3><p>Secure WebSocket MQTT transport for browser-side telemetry or backend relay.</p><div class="component-meta"><span>Transport</span><strong>WSS</strong></div></article>
+          </div>
+          <article class="panel architecture-panel"><div class="panel-header"><div><h3>Planned data flow</h3><p>Modular architecture for future integration</p></div><span class="tiny-badge">TARGET ARCHITECTURE</span></div><div class="architecture-flow"><div class="arch-node"><i data-lucide="thermometer"></i><strong>Sensors</strong><small>DHT22 · MQ-135 · GP2Y1014*</small></div><i data-lucide="arrow-right" class="arch-arrow"></i><div class="arch-node"><i data-lucide="cpu"></i><strong>ESP32</strong><small>Sampling & JSON payload</small></div><i data-lucide="arrow-right" class="arch-arrow"></i><div class="arch-node"><i data-lucide="radio-tower"></i><strong>MQTT broker</strong><small>WSS · topic subscription</small></div><i data-lucide="arrow-right" class="arch-arrow"></i><div class="arch-node highlighted-node"><i data-lucide="monitor"></i><strong>AeroFresh UI</strong><small>Charts · alerts · analytics</small></div></div><p class="fine-print">* GP2Y1014 is planned and not currently installed. Python, Pandas and machine-learning analysis are planned future work.</p></article>
+          <article class="panel mqtt-panel"><div class="panel-header"><div><h3>MQTT integration configuration</h3><p>Adapter is prepared but intentionally disabled by default.</p></div><span class="state-pill future-state">Not configured</span></div><div class="mqtt-config"><div><span>Broker URL</span><code>Not configured</code></div><div><span>Topic</span><code>aerofresh/telemetry</code></div><div><span>Connection</span><code>Disabled · no credentials stored</code></div></div><div class="mqtt-warning"><i data-lucide="lock"></i><span>Never commit broker passwords, tokens or private credentials to a public GitHub repository. Browser-side MQTT requires tightly scoped, revocable broker credentials and TLS/WSS.</span></div><details class="schema-details"><summary>View example JSON schema</summary><pre><code>{
+  "device_id": "aerofresh-esp32-01",
+  "timestamp": "2026-10-29T10:30:00Z",
+  "temperature": 28.4,
+  "humidity": 61.2,
+  "gas_adc": 1240
+}</code></pre><p>This is an example schema only; it is not a claim about the current ESP32 firmware payload.</p></details></article>
+          <div class="footer-note"><span>© 2026 AeroFresh · Engineering prototype</span><span>Built for responsible environmental insight <i data-lucide="leaf"></i></span></div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <div class="mobile-backdrop" id="mobileBackdrop"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="script.js"></script>
+</body>
+</html>
