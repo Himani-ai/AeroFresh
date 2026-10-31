@@ -243,7 +243,7 @@
     if (!window.Chart) return;
     const rows = getRangeHistory(state.range);
     const labels = rows.map(p => fmtTime(p.timestamp));
-    const chartIds = ["combinedChart", "temperatureChart", "humidityChart", "gasChart", "historyTempChart", "historyHumidityChart", "historyGasChart", "historyCombinedChart"];
+    const chartIds = ["combinedChart", "temperatureChart", "humidityChart", "gasChart", "ens160Chart", "historyTempChart", "historyHumidityChart", "historyGasChart", "historyAqiChart", "historyCombinedChart"];
     chartIds.forEach(id => { if (state.charts[id]) { state.charts[id].destroy(); delete state.charts[id]; } });
     const combined = $("#combinedChart");
     if (combined) {
@@ -261,9 +261,11 @@
       ["temperatureChart", "Temperature °C", "temperature", "#53d5bd"],
       ["humidityChart", "Humidity %", "humidity", "#50c8e8"],
       ["gasChart", "Gas response ADC", "gas_adc", "#a995ed"],
+      ["ens160Chart", "ENS160 AQI", "aqi", "#ef9b76"],
       ["historyTempChart", "Temperature °C", "temperature", "#53d5bd"],
       ["historyHumidityChart", "Humidity %", "humidity", "#50c8e8"],
-      ["historyGasChart", "Gas response ADC", "gas_adc", "#a995ed"]
+      ["historyGasChart", "Gas response ADC", "gas_adc", "#a995ed"],
+      ["historyAqiChart", "ENS160 AQI", "aqi", "#ef9b76"]
     ];
     defs.forEach(([id, label, key, color]) => {
       const el = $("#" + id); if (!el) return;
@@ -286,8 +288,9 @@
   }
 
   function pearson(a, b) {
-    const n = Math.min(a.length, b.length); if (n < 2) return 0;
-    const aa = a.slice(0, n), bb = b.slice(0, n);
+    const pairs = a.map((value, i) => [value, b[i]]).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+    const n = pairs.length; if (n < 2) return 0;
+    const aa = pairs.map(pair => pair[0]), bb = pairs.map(pair => pair[1]);
     const ma = aa.reduce((x,y)=>x+y,0)/n, mb = bb.reduce((x,y)=>x+y,0)/n;
     let num = 0, da = 0, db = 0;
     for (let i=0;i<n;i++){num+=(aa[i]-ma)*(bb[i]-mb);da+=(aa[i]-ma)**2;db+=(bb[i]-mb)**2;}
@@ -295,8 +298,8 @@
   }
   function renderCorrelation() {
     const root = $("#correlationGrid"); if (!root) return;
-    const keys = ["temperature", "humidity", "gas_adc"];
-    const names = ["Temp", "Humidity", "Gas ADC"];
+    const keys = ["temperature", "humidity", "gas_adc", "aqi"];
+    const names = ["Temp", "Humidity", "Gas ADC", "AQI"];
     const h = getRangeHistory(state.range);
     const matrix = keys.map(a => keys.map(b => pearson(h.map(p=>p[a]),h.map(p=>p[b]))));
     root.innerHTML = `<div class="corr-cell header-cell"><strong>Signal</strong></div>${names.map(n=>`<div class="corr-cell header-cell"><strong>${n}</strong></div>`).join("")}${matrix.map((row,i)=>`<div class="corr-cell header-cell"><strong>${names[i]}</strong></div>${row.map(v=>{const opacity=.07+Math.abs(v)*.27;const color=v>=0?`rgba(55,214,189,${opacity})`:`rgba(169,149,237,${opacity})`;return `<div class="corr-cell" style="background:${color}"><strong>${v.toFixed(2)}</strong><span>${v>.65?"Positive":v<-.65?"Negative":"Weak / mixed"}</span></div>`}).join("")}`).join("")}`;
@@ -386,7 +389,11 @@
   }
   function answerQuestion(question) {
     const q=question.toLowerCase(), h=state.history, latest=state.latest;
-    const maxTemp=Math.max(...h.map(p=>p.temperature)), maxHum=Math.max(...h.map(p=>p.humidity)), maxGas=Math.max(...h.map(p=>p.gas_adc));
+    const maxTemp=Math.max(...h.map(p=>p.temperature)), maxHum=Math.max(...h.map(p=>p.humidity)), maxGas=Math.max(...h.map(p=>p.gas_adc)), maxAqi=Math.max(...h.map(p=>p.aqi ?? -Infinity));
+    if(q.includes("aqi")||q.includes("air quality")||q.includes("air-quality"))return `The latest ENS160 air-quality index is ${latest.aqi ?? "unavailable"} on the library's 0–5 scale. The retained demo maximum is ${Number.isFinite(maxAqi) ? maxAqi : "unavailable"}. This is sensor output, not a food-safety measurement.`;
+    if(q.includes("tvoc")&&q.includes("eco2"))return `The latest ENS160 readings are ${latest.tvoc ?? "unavailable"} ppb TVOC and ${latest.eco2 ?? "unavailable"} ppm eCO₂. eCO₂ is an equivalent estimate, not a direct CO₂ measurement, and neither value directly measures food spoilage.`;
+    if(q.includes("tvoc"))return `The latest ENS160 TVOC estimate is ${latest.tvoc ?? "unavailable"} ppb. TVOC is an air-quality indicator and does not directly measure food spoilage.`;
+    if(q.includes("eco2")||q.includes("co2"))return `The latest ENS160 eCO₂ estimate is ${latest.eco2 ?? "unavailable"} ppm. It is an equivalent CO₂ estimate, not a direct CO₂ measurement.`;
     if(q.includes("maximum")&&q.includes("temperature"))return `The maximum temperature in the currently retained synthetic sample is ${maxTemp.toFixed(1)} °C. This is generated demo history, not a measured daily maximum.`;
     if(q.includes("humidity")&&(q.includes("increase")||q.includes("when")||q.includes("rise"))){const first=h.findIndex((p,i)=>i>0&&p.humidity-h[i-1].humidity>1.2);return first>=0?`A noticeable upward step appears around ${fmtDateTime(h[first].timestamp)} in the synthetic sample. Current humidity is ${latest.humidity.toFixed(1)}%.`:`No single sharp humidity increase was found in the current demo sample. Current humidity is ${latest.humidity.toFixed(1)}%.`;}
     if(q.includes("gas")||q.includes("adc"))return `The latest MQ-135 demo response is ${latest.gas_adc} raw ADC units. The retained sample maximum is ${maxGas} ADC. Raw ADC is a sensor response, not a calibrated gas concentration.`;
