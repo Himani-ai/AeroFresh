@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -47,7 +48,7 @@
         <button class="icon-btn menu-toggle" id="menuToggle" aria-label="Open navigation" aria-expanded="false"><i data-lucide="menu"></i></button>
         <div class="breadcrumb"><span>Workspace</span><i data-lucide="chevron-right"></i><strong id="pageCrumb">Overview</strong></div>
         <div class="topbar-actions">
-          <div class="mode-pill"><span class="status-dot demo-dot"></span><span>DEMO MODE</span></div>
+          <div class="mode-pill" id="modePill"><span class="status-dot demo-dot"></span><span id="modeLabel">DEMO MODE</span></div>
           <button class="icon-btn" id="refreshBtn" aria-label="Refresh demo data" title="Refresh demo data"><i data-lucide="refresh-cw"></i></button>
           <div class="top-date"><span class="date-label">LOCAL TIME</span><strong id="clock">--:--:--</strong></div>
         </div>
@@ -84,13 +85,13 @@
 
         <section class="page-section" id="monitoring">
           <div class="page-heading compact-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> SENSOR TELEMETRY</div><h1>Live <span class="gradient-text">monitoring</span></h1><p class="subheading">A real-time-ready view powered by a clearly marked local simulation.</p></div><span class="demo-tag"><i data-lucide="flask-conical"></i> DEMO DATA</span></div>
-          <div class="notice-banner"><i data-lucide="info"></i><div><strong>Hardware is not connected.</strong><span>These values are generated locally for demonstration. MQTT connection remains disabled until a broker is configured.</span></div></div>
+          <div class="notice-banner" id="connectionNotice"><i data-lucide="info"></i><div><strong>Hardware is not connected.</strong><span>These values are generated locally for demonstration. Configure MQTT in System Information to receive validated ESP32 readings.</span></div></div>
           <div class="sensor-grid" id="monitorSensorCards"></div>
           <div class="monitor-grid">
             <article class="panel"><div class="panel-header"><div><h3>Temperature</h3><p>DHT22 · degrees Celsius</p></div><span class="unit-chip">°C</span></div><div class="chart-wrap"><canvas id="temperatureChart"></canvas></div></article>
             <article class="panel"><div class="panel-header"><div><h3>Relative humidity</h3><p>DHT22 · relative humidity</p></div><span class="unit-chip">%</span></div><div class="chart-wrap"><canvas id="humidityChart"></canvas></div></article>
             <article class="panel"><div class="panel-header"><div><h3>MQ-135 response</h3><p>Raw analog-to-digital reading</p></div><span class="unit-chip">ADC</span></div><div class="chart-wrap"><canvas id="gasChart"></canvas></div></article>
-            <article class="panel particulate-panel"><div class="panel-header"><div><h3>Particulate level</h3><p>GP2Y1014 · planned sensor</p></div><span class="unit-chip">—</span></div><div class="empty-sensor"><div class="empty-icon"><i data-lucide="cloud-fog"></i></div><strong>Sensor not installed</strong><span>Particulate readings will appear here after hardware integration.</span><small>NO DATA AVAILABLE</small></div></article>
+            <article class="panel particulate-panel"><div class="panel-header"><div><h3>Particulate sensor</h3><p>GP2Y1014 · raw output only</p></div><span class="unit-chip">ADC</span></div><div class="empty-sensor"><div class="empty-icon"><i data-lucide="cloud-fog"></i></div><strong>Optional sensor</strong><span>Validated raw readings appear in the sensor snapshot when this planned sensor is installed.</span><small>NO PM2.5 / PM10 CLAIMS</small></div></article>
           </div>
         </section>
 
@@ -137,13 +138,17 @@
             <article class="panel component-card"><div class="component-icon"><i data-lucide="radio-tower"></i></div><div class="component-top"><span class="component-type">COMMUNICATION</span><span class="state-pill future-state">Planned</span></div><h3>Wi-Fi + MQTT</h3><p>Secure WebSocket MQTT transport for browser-side telemetry or backend relay.</p><div class="component-meta"><span>Transport</span><strong>WSS</strong></div></article>
           </div>
           <article class="panel architecture-panel"><div class="panel-header"><div><h3>Planned data flow</h3><p>Modular architecture for future integration</p></div><span class="tiny-badge">TARGET ARCHITECTURE</span></div><div class="architecture-flow"><div class="arch-node"><i data-lucide="thermometer"></i><strong>Sensors</strong><small>DHT22 · MQ-135 · GP2Y1014*</small></div><i data-lucide="arrow-right" class="arch-arrow"></i><div class="arch-node"><i data-lucide="cpu"></i><strong>ESP32</strong><small>Sampling & JSON payload</small></div><i data-lucide="arrow-right" class="arch-arrow"></i><div class="arch-node"><i data-lucide="radio-tower"></i><strong>MQTT broker</strong><small>WSS · topic subscription</small></div><i data-lucide="arrow-right" class="arch-arrow"></i><div class="arch-node highlighted-node"><i data-lucide="monitor"></i><strong>AeroFresh UI</strong><small>Charts · alerts · analytics</small></div></div><p class="fine-print">* GP2Y1014 is planned and not currently installed. Python, Pandas and machine-learning analysis are planned future work.</p></article>
-          <article class="panel mqtt-panel"><div class="panel-header"><div><h3>MQTT integration configuration</h3><p>Adapter is prepared but intentionally disabled by default.</p></div><span class="state-pill future-state">Not configured</span></div><div class="mqtt-config"><div><span>Broker URL</span><code>Not configured</code></div><div><span>Topic</span><code>aerofresh/telemetry</code></div><div><span>Connection</span><code>Disabled · no credentials stored</code></div></div><div class="mqtt-warning"><i data-lucide="lock"></i><span>Never commit broker passwords, tokens or private credentials to a public GitHub repository. Browser-side MQTT requires tightly scoped, revocable broker credentials and TLS/WSS.</span></div><details class="schema-details"><summary>View example JSON schema</summary><pre><code>{
+          <article class="panel mqtt-panel"><div class="panel-header"><div><h3>MQTT integration configuration</h3><p>Settings stay in this browser and are never committed to the repository.</p></div><span class="state-pill future-state" id="mqttState">Not configured</span></div><form class="mqtt-form" id="mqttForm"><label>Broker WSS URL<input id="mqttBrokerUrl" type="url" placeholder="wss://broker.example.com:8084/mqtt" required></label><label>Topic<input id="mqttTopic" type="text" placeholder="aerofresh/telemetry" required></label><label>Device ID<input id="mqttDeviceId" type="text" placeholder="aerofresh-esp32-01" required></label><label>Username<input id="mqttUsername" type="text" autocomplete="username"></label><label>Password<input id="mqttPassword" type="password" autocomplete="current-password"></label><label class="mqtt-checkbox"><input id="mqttRemember" type="checkbox"> Remember settings in this browser</label><div class="mqtt-actions"><button class="text-button" type="submit">Connect live MQTT</button><button class="text-button secondary-button" id="mqttDisconnect" type="button">Disconnect</button></div><p class="form-error" id="mqttError" role="alert"></p></form><div class="mqtt-config"><div><span>Broker URL</span><code id="mqttBrokerSummary">Not configured</code></div><div><span>Topic</span><code id="mqttTopicSummary">aerofresh/telemetry</code></div><div><span>Connection</span><code id="mqttConnectionSummary">Demo mode · not connected</code></div></div><div class="mqtt-warning"><i data-lucide="lock"></i><span>Never commit broker passwords, tokens or private credentials to a public GitHub repository. Browser-side MQTT requires tightly scoped, revocable broker credentials and TLS/WSS.</span></div><details class="schema-details"><summary>View example JSON schema</summary><pre><code>{
   "device_id": "aerofresh-esp32-01",
   "timestamp": "2026-10-29T10:30:00Z",
   "temperature": 28.4,
   "humidity": 61.2,
-  "gas_adc": 1240
-}</code></pre><p>This is an example schema only; it is not a claim about the current ESP32 firmware payload.</p></details></article>
+  "gas_adc": 1240,
+  "dust_raw": 820,
+  "aqi": 2,
+  "tvoc": 150,
+  "eco2": 650
+}</code></pre><p>Temperature, humidity and gas_adc are required. dust_raw, aqi, tvoc and eco2 are optional. dust_raw is an uncalibrated sensor output, not PM2.5 or PM10.</p></details></article>
           <div class="footer-note"><span>© 2026 AeroFresh · Engineering prototype</span><span>Built for responsible environmental insight <i data-lucide="leaf"></i></span></div>
         </section>
       </div>

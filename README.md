@@ -2,7 +2,7 @@
 
 AeroFresh is a responsive, static frontend prototype for an environmental monitoring and food-storage risk analytics engineering project. It is built with HTML5, CSS3 and vanilla JavaScript, with Chart.js for interactive charts and Lucide icons.
 
-**Current status: demo-only.** The site does not connect to an ESP32, MQTT broker, database, AI model or physical sensor. All initial readings, historical series and alerts are synthetic interface-test data. The particulate sensor is shown as planned / not installed.
+**Current status: demo by default, with optional live MQTT.** The site can receive validated ESP32 telemetry over secure WebSockets when configured in the System Information screen. No broker, credentials or hardware are included in this repository. Demo readings remain synthetic until a live connection is established.
 
 ## Project structure
 
@@ -26,13 +26,12 @@ Chart.js and Lucide are loaded from public CDNs, and the font is loaded from Goo
 
 - Responsive desktop sidebar and mobile navigation drawer.
 - Overview, Live Monitoring, Historical Analytics, Anomaly Detection, Risk Analysis, Ask AeroFresh and System Information views.
-- DHT22 temperature / humidity and MQ-135 raw ADC demo sensor cards.
-- GP2Y1014 particulate placeholder (no reading until installed).
+- DHT22 temperature / humidity, MQ-135 raw ADC, GP2Y1014 raw output and ENS160 AQI/TVOC/eCO₂ cards.
 - Chart.js time-series charts, time-range selector and a sample correlation matrix.
 - Experimental 0–100 environmental risk indicator with a separate documented calculation function.
 - Simulated anomaly and system alerts.
 - Local keyword-based demo assistant; no AI model is connected.
-- Isolated MQTT adapter boundary, disabled by default.
+- MQTT.js WSS adapter with browser-local configuration, validation, reconnect, connection states and stale-data detection.
 
 ## Demo data and risk model
 
@@ -77,32 +76,30 @@ This is a **documented example schema only**. It is not a claim about the curren
 ```json
 {
   "device_id": "aerofresh-esp32-01",
-  "timestamp": "2026-10-29T10:30:00Z",
+  "timestamp": "2026-10-31T08:30:00Z",
   "temperature": 28.4,
   "humidity": 61.2,
-  "gas_adc": 1240
+  "gas_adc": 1240,
+  "dust_raw": 820,
+  "aqi": 2,
+  "tvoc": 150,
+  "eco2": 650
 }
 ```
 
-### Integration boundary
+### Live MQTT configuration
 
 The future adapter lives in `script.js`:
 
-- `DEMO_CONFIG.mqtt` holds the broker URL, topic and connection options.
-- `initMqttAdapter()` refuses to connect unless `enabled` is true and a broker URL is provided.
-- `connectMqtt()` creates the MQTT.js client over secure WebSockets (WSS), subscribes to the configured topic and handles reconnect, offline, close and error events.
-- Incoming JSON is parsed and passed to `handleIncomingReading(payload)`.
-- `handleIncomingReading()` validates required numeric fields and timestamp before adding a normalized reading to the history and refreshing the UI.
+Use **System Information → MQTT integration configuration**:
 
-To enable it later:
+1. Choose a broker that supports TLS-secured WebSockets and enter its `wss://` URL, topic and device ID.
+2. Use a dedicated, revocable browser account with read-only permission to the exact topic.
+3. Optionally remember settings in browser local storage. Passwords are never written to source code.
+4. Click **Connect live MQTT**. The dashboard changes to live mode only after connection and subscription succeed.
+5. Test malformed JSON, wrong device IDs, missing optional sensors, reconnects and stale readings before connecting hardware.
 
-1. Choose an MQTT broker that supports TLS-secured WebSockets.
-2. Define a topic and a stable JSON payload contract in the ESP32 firmware.
-3. Load MQTT.js in `index.html` (for example, a pinned MQTT.js browser bundle from a trusted CDN or a locally hosted bundle).
-4. Configure `DEMO_CONFIG.mqtt.brokerUrl` and `topic`, then set `enabled: true`.
-5. Supply credentials through an appropriately designed authentication flow; do not commit secrets.
-6. Test invalid messages, missing fields, timestamp handling, reconnect behavior and broker authorization.
-7. Add a true connection-state UI before representing hardware as online. The current dashboard deliberately stays labeled as demo until this UI is completed.
+Required message fields are `device_id`, ISO `timestamp`, `temperature` (-40 to 85 °C), `humidity` (0 to 100 %) and `gas_adc` (0 to 4095). Optional fields are `dust_raw` (0 to 4095 raw sensor output), `aqi` (0 to 5), `tvoc` (0 to 65000 ppb) and `eco2` (400 to 65000 ppm estimated equivalent CO₂). Missing optional fields display as unavailable; they are never replaced with zero.
 
 **Security warning:** a public static website cannot keep embedded credentials secret. Browser-side MQTT requires narrowly scoped, revocable credentials with read-only access to only the required topic, rate limits and TLS/WSS. Never put administrator credentials, private tokens or long-lived secrets in a public GitHub repository. For production, prefer a backend relay/API that authenticates devices, validates messages and serves authorized data to the frontend.
 
