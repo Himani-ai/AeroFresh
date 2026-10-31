@@ -18,7 +18,7 @@
       reconnectPeriodMs: 3000,
       staleTimeoutMs: 90000
     },
-    demoLatest: { temperature: 28.4, humidity: 61.2, gas_adc: 1240, dust_raw: null, aqi: null, tvoc: null, eco2: null },
+    demoLatest: { temperature: 28.4, humidity: 61.2, gas_adc: 1240, dust_raw: null, aqi: 2, tvoc: 150, eco2: 650 },
     demoSeed: 42
   };
 
@@ -55,7 +55,16 @@
       const temperature = 27.1 + Math.sin(phase) * 1.25 + (rand() - .5) * 1.1 + (i < 28 ? .7 : 0);
       const humidity = 58 + Math.cos(phase * .8) * 5.4 + (rand() - .5) * 5 + (i < 45 ? 4 : 0);
       const gas = 1040 + Math.sin(phase * 1.2) * 130 + (rand() - .5) * 170 + (i < 30 ? 180 : 0);
-      points.push({ timestamp: t, temperature: +temperature.toFixed(1), humidity: +clamp(humidity, 35, 85).toFixed(1), gas_adc: Math.round(clamp(gas, 500, 1800)) });
+      points.push({
+        timestamp: t,
+        temperature: +temperature.toFixed(1),
+        humidity: +clamp(humidity, 35, 85).toFixed(1),
+        gas_adc: Math.round(clamp(gas, 500, 1800)),
+        dust_raw: null,
+        aqi: Math.round(clamp(1.7 + Math.sin(phase * .7) * .8 + (rand() - .5) * .7, 1, 4)),
+        tvoc: Math.round(clamp(125 + Math.sin(phase * .9) * 55 + (rand() - .5) * 35, 50, 350)),
+        eco2: Math.round(clamp(585 + Math.sin(phase * .6) * 75 + (rand() - .5) * 55, 450, 900))
+      });
     }
     // Keep the final sample aligned with the visible demo configuration.
     Object.assign(points[points.length - 1], DEMO_CONFIG.demoLatest);
@@ -336,7 +345,13 @@
     };
     state.history.push(next);
     if (state.history.length > 240) state.history.shift();
-    state.latest = { ...next, dust_raw: null, aqi: null, tvoc: null, eco2: null };
+    state.latest = {
+      ...next,
+      dust_raw: null,
+      aqi: Math.round(clamp(last.aqi + (rand() - .48) * .25, 1, 4)),
+      tvoc: Math.round(clamp(last.tvoc + (rand() - .48) * 14, 50, 350)),
+      eco2: Math.round(clamp(last.eco2 + (rand() - .48) * 22, 450, 900))
+    };
     state.lastUpdated = new Date();
     $("#lastUpdated").textContent = fmtTime(state.lastUpdated);
     renderAll();
@@ -351,7 +366,7 @@
     const last = state.history[state.history.length - 1], rand = Math.random;
     const next = { timestamp: new Date(), temperature: +clamp(last.temperature + (rand()-.5)*.25,22,34).toFixed(1), humidity: +clamp(last.humidity + (rand()-.5)*.8,40,82).toFixed(1), gas_adc: Math.round(clamp(last.gas_adc+(rand()-.5)*35,650,1700)) };
     state.history.push(next); if(state.history.length>240)state.history.shift();
-    state.latest={...next,dust_raw:null,aqi:null,tvoc:null,eco2:null};state.lastUpdated=new Date();
+    state.latest={...next,dust_raw:null,aqi:Math.round(clamp(last.aqi+(rand()-.5)*.1,1,4)),tvoc:Math.round(clamp(last.tvoc+(rand()-.5)*7,50,350)),eco2:Math.round(clamp(last.eco2+(rand()-.5)*12,450,900))};state.lastUpdated=new Date();
     $("#lastUpdated").textContent=fmtTime(state.lastUpdated);
     renderSensorCards("#sensorCards");renderSensorCards("#monitorSensorCards");renderRisk();renderCharts();renderCorrelation();
   }
