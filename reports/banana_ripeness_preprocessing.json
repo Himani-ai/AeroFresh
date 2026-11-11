@@ -1,0 +1,82 @@
+{
+  "source": "University of Bath banana ripeness estimation data; DOI 10.15125/BATH-01459; CC BY 4.0",
+  "class_mapping": {
+    "1": "unripe",
+    "2": "ripe",
+    "3": "beyond_ripe",
+    "4": "overripe",
+    "5": "gone_off"
+  },
+  "preprocessing": {
+    "merge": "feature/label files joined one-to-one after verifying matching source index sequences",
+    "split": "original train/test splits retained",
+    "missing_values": "none found",
+    "duplicate_source_indices": "none found within each split",
+    "scaling": "not applied; fit scalers only on training data inside model pipelines",
+    "spectral_floor": "values around 5.88e-39 retained pending metadata/source clarification"
+  },
+  "data_splits": [
+    {
+      "name": "VOC_train",
+      "rows": 18819,
+      "features": 3,
+      "missing": 0,
+      "duplicate_indices": 0,
+      "class_counts": {
+        "unripe": 3764,
+        "ripe": 3764,
+        "beyond_ripe": 3764,
+        "overripe": 3764,
+        "gone_off": 3763
+      }
+    },
+    {
+      "name": "VOC_test",
+      "rows": 8066,
+      "features": 3,
+      "missing": 0,
+      "duplicate_indices": 0,
+      "class_counts": {
+        "unripe": 1613,
+        "ripe": 1613,
+        "beyond_ripe": 1613,
+        "overripe": 1613,
+        "gone_off": 1614
+      }
+    },
+    {
+      "name": "TPHiS_train",
+      "rows": 22865,
+      "features": 21,
+      "missing": 0,
+      "duplicate_indices": 0,
+      "class_counts": {
+        "unripe": 4573,
+        "ripe": 4573,
+        "beyond_ripe": 4573,
+        "overripe": 4573,
+        "gone_off": 4573
+      }
+    },
+    {
+      "name": "TPHiS_test",
+      "rows": 9800,
+      "features": 21,
+      "missing": 0,
+      "duplicate_indices": 0,
+      "class_counts": {
+        "unripe": 1960,
+        "ripe": 1960,
+        "beyond_ripe": 1960,
+        "overripe": 1960,
+        "gone_off": 1960
+      }
+    }
+  ],
+  "limitations": [
+    "VOC sensors are TGS2620, TGS2602 and SGP40, not MQ-135.",
+    "TPHiS contains BME280 and spectral features, not MQ-135 or LDR.",
+    "VOC and TPHiS row indices must not be used to merge the two subsets.",
+    "The sample-level random split may place related time-adjacent observations in train and test; results do not prove new-bunch generalization."
+  ]
+}
