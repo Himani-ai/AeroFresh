@@ -346,7 +346,7 @@
       timestamp: new Date(),
       temperature: +clamp(last.temperature + (rand() - .47) * .65, 22, 34).toFixed(1),
       humidity: +clamp(last.humidity + (rand() - .48) * 2.2, 40, 82).toFixed(1),
-      gas_adc: Math.round(clamp(last.gas_adc + (rand() - .48) * 95, 650, 1700))
+      gas_adc: Math.round(clamp(last.gas_adc + (rand() - .48) * 95, 650, 1700)),\n      ldr_adc: Math.round(clamp((last.ldr_adc ?? 2100) + (rand() - .5) * 80, 0, 4095))
     };
     state.history.push(next);
     if (state.history.length > 240) state.history.shift();
@@ -369,7 +369,7 @@
   }
   function refreshDemoQuietly() {
     const last = state.history[state.history.length - 1], rand = Math.random;
-    const next = { timestamp: new Date(), temperature: +clamp(last.temperature + (rand()-.5)*.25,22,34).toFixed(1), humidity: +clamp(last.humidity + (rand()-.5)*.8,40,82).toFixed(1), gas_adc: Math.round(clamp(last.gas_adc+(rand()-.5)*35,650,1700)) };
+    const next = { timestamp: new Date(), temperature: +clamp(last.temperature + (rand()-.5)*.25,22,34).toFixed(1), humidity: +clamp(last.humidity + (rand()-.5)*.8,40,82).toFixed(1), gas_adc: Math.round(clamp(last.gas_adc+(rand()-.5)*35,650,1700)), ldr_adc: Math.round(clamp((last.ldr_adc??2100)+(rand()-.5)*40,0,4095)) };
     state.history.push(next); if(state.history.length>240)state.history.shift();
     state.latest={...next,dust_raw:null,aqi:Math.round(clamp(last.aqi+(rand()-.5)*.1,1,4)),tvoc:Math.round(clamp(last.tvoc+(rand()-.5)*7,50,350)),eco2:Math.round(clamp(last.eco2+(rand()-.5)*12,450,900))};state.lastUpdated=new Date();
     $("#lastUpdated").textContent=fmtTime(state.lastUpdated);
