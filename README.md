@@ -26,11 +26,13 @@ Chart.js and Lucide are loaded from public CDNs, and the font is loaded from Goo
 
 - Responsive desktop sidebar and mobile navigation drawer.
 - Overview, Live Monitoring, Historical Analytics, Anomaly Detection, Risk Analysis, Ask AeroFresh and System Information views.
-- DHT22 temperature / humidity, MQ-135 raw ADC, GP2Y1014 raw output and ENS160 AQI/TVOC/eCO₂ cards.
+- DHT22 temperature / humidity, MQ-135 gas response and LDR light-level monitoring.
+- Demo-only storage door open / close controls; live commands require an active MQTT connection and status telemetry confirmation.
+- Browser-local edge archive using IndexedDB, with a rolling seven-day retention window.
 - Chart.js time-series charts, time-range selector and a sample correlation matrix.
 - Experimental 0–100 environmental risk indicator with a separate documented calculation function.
 - Simulated anomaly and system alerts.
-- Local keyword-based demo assistant; no AI model is connected.
+- Local keyword-based demo assistant.
 - MQTT.js WSS adapter with browser-local configuration, validation, reconnect, connection states and stale-data detection.
 
 ## Demo data and risk model
@@ -39,7 +41,7 @@ The clearly marked `DEMO CONFIGURATION` at the top of `script.js` contains the d
 
 `calculateEnvironmentalRisk(reading, history)` is intentionally separate from rendering. It combines illustrative temperature deviation, humidity deviation, relative gas-response variation and persistence weights. The output is an experimental environmental indicator, **not** a scientifically validated food-spoilage probability, a food-safety measurement or a substitute for food-handling guidance. Thresholds and weights must be validated against calibrated sensor data and appropriate food-storage studies before any real-world use.
 
-The MQ-135 field is raw ADC response, not a gas concentration. Sensor warm-up, calibration, analog front-end design and environmental cross-sensitivity must be considered during hardware integration.
+The MQ-135 and LDR fields are raw ADC readings, not calibrated gas concentration or illuminance. Sensor warm-up, calibration, analog front-end design and environmental cross-sensitivity must be considered during hardware integration.
 
 ## GitHub repository and Pages deployment
 
@@ -63,7 +65,9 @@ All local asset references are relative (`style.css`, `script.js`), so the site 
 - [ ] Change the analytics range (1 hour, 6 hours, 24 hours, 7 days).
 - [ ] Filter the alert list by severity.
 - [ ] Try the suggested Ask AeroFresh questions.
-- [ ] Confirm GP2Y1014 is displayed as planned / no data.
+- [ ] Open and close the storage door in demo mode and confirm the page labels the action as simulated.
+- [ ] Confirm DHT22, MQ-135 and LDR are displayed as sensors.
+- [ ] Confirm local archive records appear and records older than seven days are purged.
 - [ ] Confirm browser console shows MQTT disabled unless you deliberately configure it.
 - [ ] Repeat the same checks on the GitHub Pages URL.
 
@@ -80,10 +84,8 @@ This is a **documented example schema only**. It is not a claim about the curren
   "temperature": 28.4,
   "humidity": 61.2,
   "gas_adc": 1240,
-  "dust_raw": 820,
-  "aqi": 2,
-  "tvoc": 150,
-  "eco2": 650
+  "ldr_adc": 1860,
+  "door_state": "closed"
 }
 ```
 
@@ -94,22 +96,20 @@ The future adapter lives in `script.js`:
 Use **System Information → MQTT integration configuration**:
 
 1. Choose a broker that supports TLS-secured WebSockets and enter its `wss://` URL, topic and device ID.
-2. Use a dedicated, revocable browser account with read-only permission to the exact topic.
+2. Use dedicated, revocable credentials: read-only access to the telemetry topic and publish-only access to its `/door/command` subtopic.
 3. Optionally remember settings in browser local storage. Passwords are never written to source code.
 4. Click **Connect live MQTT**. The dashboard changes to live mode only after connection and subscription succeed.
-5. Test malformed JSON, wrong device IDs, missing optional sensors, reconnects and stale readings before connecting hardware.
+5. Test malformed JSON, wrong device IDs, missing required sensor fields, reconnects and stale readings before connecting hardware.
 
-Required message fields are `device_id`, UTC ISO `timestamp`, `temperature` (-40 to 85 °C), `humidity` (0 to 100 %), `gas_adc` (0 to 4095) and `ldr_adc` (0 to 4095). Optional fields are `dust_raw` (0 to 4095 raw sensor output), `aqi` (0 to 5), `tvoc` (0 to 65000 ppb) and `eco2` (400 to 65000 ppm estimated equivalent CO₂). Missing optional fields display as unavailable; they are never replaced with zero.
+Required telemetry fields are `device_id`, UTC ISO `timestamp`, `temperature` (-40 to 85 °C), `humidity` (0 to 100 %), `gas_adc` (0 to 4095) and `ldr_adc` (0 to 4095). These map to the DHT22, MQ-135 and LDR readings. Include `door_state` as `open` or `closed` in telemetry to confirm actuator state.
 
-**Security warning:** a public static website cannot keep embedded credentials secret. Browser-side MQTT requires narrowly scoped, revocable credentials with read-only access to only the required topic, rate limits and TLS/WSS. Never put administrator credentials, private tokens or long-lived secrets in a public GitHub repository. For production, prefer a backend relay/API that authenticates devices, validates messages and serves authorized data to the frontend.
+When MQTT is connected, door commands publish JSON to `<telemetry-topic>/door/command`, for example `{"device_id":"aerofresh-esp32-01","command":"door.set","door_state":"open","timestamp":"2026-10-31T08:30:00Z"}`. The interface waits for a telemetry message containing the confirmed `door_state`; it does not treat command delivery as proof the door moved. Without an active connection, the buttons only change the local demo state. Saved MQTT settings do not auto-connect on page load.
 
-### Suggested payload extension
+**Security warning:** a public static website cannot keep embedded credentials secret. Browser-side MQTT requires narrowly scoped, revocable credentials with read access only to the telemetry topic and publish access only to the door-command topic, rate limits and TLS/WSS. Never put administrator credentials, private tokens or long-lived secrets in a public GitHub repository. For production, prefer a backend relay/API that authenticates devices, validates messages and serves authorized data to the frontend. The controller must enforce its own physical safety limits and validate every command.
 
-When GP2Y1014 is installed and calibrated, agree on a documented field name and units (for example, `particulate_ug_m3` only if the sensor conversion is validated). Do not silently interpret raw voltage or ADC counts as a calibrated particulate concentration.
+## Edge archive and assistant
 
-## Future analytics and assistant
-
-Python, Pandas and machine-learning analytics are planned future work, not currently implemented. A production data pipeline could persist validated telemetry, calculate derived features server-side, version model outputs and expose authenticated APIs. The Ask AeroFresh interface currently uses local keyword matching; replace `answerQuestion()` with a call to a secure backend endpoint when an assistant service is available. Never expose API keys in frontend JavaScript.
+The Edge data archive stores sampled demo or MQTT sensor readings in browser IndexedDB. It imports the initial demo history when the archive is empty, then stores at most one new sample per minute. Entries older than seven days are removed on startup and every minute while the page is open. Data remains in that browser and is not stored on the ESP32 or sent to a server. The Ask AeroFresh interface uses local keyword matching; replace `answerQuestion()` with a secure backend endpoint when an assistant service is available. Never expose API keys in frontend JavaScript.
 
 ## Technology and hosting notes
 

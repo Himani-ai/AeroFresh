@@ -18,7 +18,7 @@
       reconnectPeriodMs: 3000,
       staleTimeoutMs: 90000
     },
-    demoLatest: { temperature: 28.4, humidity: 61.2, gas_adc: 1240, ldr_adc: 2100, dust_raw: null, aqi: 2, tvoc: 150, eco2: 650 },
+    demoLatest: { temperature: 28.4, humidity: 61.2, gas_adc: 1240, ldr_adc: 2100 },
     demoSeed: 42
   };
 
@@ -26,14 +26,12 @@
     temperature: { label: "Temperature", unit: "°C", sensor: "DHT22", icon: "thermometer", iconClass: "temperature", color: "#53d5bd", min: 20, max: 34 },
     humidity: { label: "Relative humidity", unit: "%", sensor: "DHT22", icon: "droplets", iconClass: "humidity", color: "#50c8e8", min: 35, max: 85 },
     gas_adc: { label: "MQ-135 gas response", unit: "ADC", sensor: "MQ-135", icon: "wind", iconClass: "gas", color: "#a995ed", min: 0, max: 4095 },
-    ldr_adc: { label: "Ambient light response", unit: "ADC", sensor: "LDR", icon: "sun", iconClass: "light", color: "#e6bd7e", min: 0, max: 4095 },
-    dust_raw: { label: "Particulate sensor output", unit: "ADC", sensor: "GP2Y1014", icon: "cloud-fog", iconClass: "particle", color: "#e6bd7e", min: 0, max: 4095 },
-    aqi: { label: "ENS160 air-quality index", unit: "AQI", sensor: "ENS160", icon: "gauge", iconClass: "aqi", color: "#ef9b76", min: 0, max: 5 },
-    tvoc: { label: "ENS160 TVOC", unit: "ppb", sensor: "ENS160", icon: "flask-conical", iconClass: "tvoc", color: "#d49be8", min: 0, max: 65000 },
-    eco2: { label: "ENS160 eCO₂ estimate", unit: "ppm", sensor: "ENS160", icon: "cloud", iconClass: "eco2", color: "#8fc7ed", min: 400, max: 65000 }
+    ldr_adc: { label: "LDR light level", unit: "ADC", sensor: "LDR", icon: "sun", iconClass: "light", color: "#f4bd69", min: 0, max: 4095 }
   };
 
-  const state = { mode: "demo", connection: "demo", latest: { ...DEMO_CONFIG.demoLatest }, history: [], alerts: [], charts: {}, range: "1h", lastUpdated: new Date(), mqttClient: null, refreshTimer: null, lastLiveUpdate: null, mqttConfig: { ...DEMO_CONFIG.mqtt } };
+  const EDGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+  const EDGE_SAMPLE_INTERVAL_MS = 60 * 1000;
+  const state = { mode: "demo", connection: "demo", latest: { ...DEMO_CONFIG.demoLatest }, history: [], alerts: [], charts: {}, range: "1h", lastUpdated: new Date(), mqttClient: null, refreshTimer: null, lastLiveUpdate: null, mqttConfig: { ...DEMO_CONFIG.mqtt }, door: { status: "closed", pending: null, timer: null, confirmedLive: false }, edge: { database: null, lastSavedAt: 0, history: [] } };
   const $ = (s, root = document) => root.querySelector(s);
   const $$ = (s, root = document) => [...root.querySelectorAll(s)];
   const fmtTime = d => new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(d);
@@ -61,11 +59,7 @@
         temperature: +temperature.toFixed(1),
         humidity: +clamp(humidity, 35, 85).toFixed(1),
         gas_adc: Math.round(clamp(gas, 500, 1800)),
-        ldr_adc: Math.round(clamp(2100 + (rand() - .5) * 500, 0, 4095)),
-        dust_raw: null,
-        aqi: Math.round(clamp(1.7 + Math.sin(phase * .7) * .8 + (rand() - .5) * .7, 1, 4)),
-        tvoc: Math.round(clamp(125 + Math.sin(phase * .9) * 55 + (rand() - .5) * 35, 50, 350)),
-        eco2: Math.round(clamp(585 + Math.sin(phase * .6) * 75 + (rand() - .5) * 55, 450, 900))
+  ldr_adc: Math.round(clamp(1850 + Math.sin(phase + .5) * 700 + (rand() - .5) * 360, 0, 4095))
       });
     }
     // Keep the final sample aligned with the visible demo configuration.
@@ -99,7 +93,7 @@
       { id: "a1", severity: "high", title: "Sudden temperature rise", description: "Illustrative temperature trend moved above the prototype reference band.", timestamp: new Date(now - 8 * 60000), source: "SIMULATED" },
       { id: "a2", severity: "medium", title: "Persistent high humidity", description: "Sample humidity remained elevated across several generated readings.", timestamp: new Date(now - 31 * 60000), source: "SIMULATED" },
       { id: "a3", severity: "medium", title: "Unusual gas-response variation", description: "MQ-135 raw ADC sample varied from its recent synthetic baseline.", timestamp: new Date(now - 74 * 60000), source: "SIMULATED" },
-      { id: "a4", severity: "low", title: "Particulate sensor unavailable", description: "GP2Y1014 is planned and is not installed in this prototype.", timestamp: new Date(now - 3 * 3600000), source: "SYSTEM DEMO" },
+      { id: "a4", severity: "low", title: "Light-level variation", description: "The sample LDR signal changed during the generated history.", timestamp: new Date(now - 3 * 3600000), source: "SIMULATED" },
       { id: "a5", severity: "low", title: "Device offline state", description: "The dashboard remains in local demo mode; no ESP32 session is active.", timestamp: new Date(now - 5 * 3600000), source: "SYSTEM DEMO" }
     ];
   }
@@ -110,10 +104,12 @@
     state.alerts = buildDemoAlerts(state.history);
     state.lastUpdated = new Date();
     renderAll();
+    initEdgeArchive();
     initNavigation();
     initChat();
     initRangeControls();
     initMqttAdapter();
+    initDoorControl();
     startDemoRefresh();
     updateClock();
     setInterval(updateClock, 1000);
@@ -122,6 +118,82 @@
     $("#alertFilter").addEventListener("change", renderAllAlerts);
     $("#clearChat").addEventListener("click", clearChat);
     window.addEventListener("resize", debounce(() => Object.values(state.charts).forEach(c => c.resize()), 120));
+  }
+
+  function initEdgeArchive() {
+    const status = $("#edgeArchiveStatus");
+    if (!window.indexedDB) {
+      if (status) status.textContent = "Browser storage unavailable";
+      return;
+    }
+    const request = indexedDB.open("aerofresh-edge-archive", 1);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains("readings")) {
+        const store = database.createObjectStore("readings", { keyPath: "timestamp" });
+        store.createIndex("timestamp", "timestamp", { unique: true });
+      }
+    };
+    request.onsuccess = () => {
+      state.edge.database = request.result;
+      state.edge.lastSavedAt = Date.now();
+      const count = state.edge.database.transaction("readings", "readonly").objectStore("readings").count();
+      count.onsuccess = () => {
+        if (count.result === 0) archiveReadings(state.history, "demo");
+        else loadEdgeArchive();
+      };
+      pruneEdgeArchive();
+      setInterval(pruneEdgeArchive, 60 * 1000);
+    };
+    request.onerror = () => {
+      if (status) status.textContent = "Could not open browser storage";
+    };
+  }
+
+  function archiveReadings(readings, mode) {
+    if (!state.edge.database || !readings.length) return;
+    const transaction = state.edge.database.transaction("readings", "readwrite");
+    const store = transaction.objectStore("readings");
+    readings.forEach(reading => store.put({ ...reading, timestamp: new Date(reading.timestamp).toISOString(), mode }));
+    transaction.oncomplete = loadEdgeArchive;
+  }
+
+  function archiveReading(reading) {
+    if (!state.edge.database || Date.now() - state.edge.lastSavedAt < EDGE_SAMPLE_INTERVAL_MS) return;
+    state.edge.lastSavedAt = Date.now();
+    archiveReadings([reading], state.mode);
+  }
+
+  function pruneEdgeArchive() {
+    const database = state.edge.database;
+    if (!database) return;
+    const cutoff = new Date(Date.now() - EDGE_RETENTION_MS).toISOString();
+    const transaction = database.transaction("readings", "readwrite");
+    const request = transaction.objectStore("readings").index("timestamp").openCursor(window.IDBKeyRange.upperBound(cutoff, true));
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (cursor) {
+        cursor.delete();
+        cursor.continue();
+      }
+    };
+    transaction.oncomplete = loadEdgeArchive;
+  }
+
+  function loadEdgeArchive() {
+    const database = state.edge.database;
+    const countLabel = $("#edgeArchiveCount");
+    const status = $("#edgeArchiveStatus");
+    if (!database) return;
+    const request = database.transaction("readings", "readonly").objectStore("readings").getAll();
+    request.onsuccess = () => {
+      state.edge.history = request.result
+        .map(reading => ({ ...reading, timestamp: new Date(reading.timestamp) }))
+        .sort((left, right) => left.timestamp - right.timestamp);
+      if (countLabel) countLabel.textContent = state.edge.history.length.toLocaleString();
+      if (status) status.textContent = "Active · this browser";
+      if (state.range === "7d") { renderCharts(); renderCorrelation(); }
+    };
   }
 
   function renderAll() {
@@ -135,6 +207,7 @@
     renderAnomalySummary();
     renderAllAlerts();
     renderConnectionState();
+    renderDoorControl();
     if (window.lucide) lucide.createIcons();
   }
 
@@ -144,7 +217,7 @@
     root.innerHTML = Object.entries(SENSOR_META).map(([key, meta]) => {
       const value = state.latest[key];
       const missing = value == null;
-      const display = missing ? "—" : (["gas_adc", "ldr_adc", "dust_raw", "aqi", "tvoc", "eco2"].includes(key) ? Math.round(value).toLocaleString() : Number(value).toFixed(1));
+  const display = missing ? "—" : (["gas_adc", "ldr_adc"].includes(key) ? Math.round(value).toLocaleString() : Number(value).toFixed(1));
       const trend = getTrend(key);
       return `<article class="sensor-card">
         <div class="sensor-card-top"><span class="sensor-icon ${meta.iconClass}"><i data-lucide="${meta.icon}"></i></span><span class="sensor-state"><b class="status-dot ${state.mode === "mqtt" ? "live-dot" : "demo-dot"}"></b>${missing ? "UNAVAILABLE" : state.mode === "mqtt" ? "LIVE DATA" : "DEMO DATA"}</span></div>
@@ -230,22 +303,15 @@
   }
   function getRangeHistory(range) {
     const all = state.history;
-    const count = { "1h": 12, "6h": 72, "24h": 288, "7d": 288 }[range] || 12;
-    let slice = all.slice(-count);
-    if (range === "7d") {
-      // Expand the 14-hour synthetic seed into a visually honest demo window by sampling with repeated daily labels.
-      slice = Array.from({ length: 56 }, (_, i) => {
-        const src = all[Math.floor(i / 56 * all.length)];
-        return { ...src, timestamp: new Date(Date.now() - (55 - i) * 3 * 3600000) };
-      });
-    }
-    return slice;
+    if (range === "7d") return state.edge.history;
+    const count = { "1h": 12, "6h": 72, "24h": 288 }[range] || 12;
+    return all.slice(-count);
   }
   function renderCharts() {
     if (!window.Chart) return;
     const rows = getRangeHistory(state.range);
     const labels = rows.map(p => fmtTime(p.timestamp));
-    const chartIds = ["combinedChart", "temperatureChart", "humidityChart", "gasChart", "ens160Chart", "historyTempChart", "historyHumidityChart", "historyGasChart", "historyAqiChart", "historyCombinedChart"];
+    const chartIds = ["combinedChart", "temperatureChart", "humidityChart", "gasChart", "ldrChart", "historyTempChart", "historyHumidityChart", "historyGasChart", "historyLdrChart", "historyCombinedChart"];
     chartIds.forEach(id => { if (state.charts[id]) { state.charts[id].destroy(); delete state.charts[id]; } });
     const combined = $("#combinedChart");
     if (combined) {
@@ -253,8 +319,9 @@
       chartFor("combinedChart", { type: "line", data: { labels, datasets: [
         makeDataset("Temperature °C", rows.map(p => p.temperature), "#53d5bd", ctx),
         makeDataset("Humidity %", rows.map(p => p.humidity), "#50c8e8", ctx),
-        makeDataset("Gas response ADC", rows.map(p => p.gas_adc / 30), "#a995ed", ctx)
-      ] }, options: chartBaseOptions("Scaled signal · gas ADC ÷ 30") });
+        makeDataset("Gas response ADC", rows.map(p => p.gas_adc / 30), "#a995ed", ctx),
+        makeDataset("LDR light ADC", rows.map(p => p.ldr_adc / 30), "#f4bd69", ctx)
+      ] }, options: chartBaseOptions("Scaled sensor signals · ADC ÷ 30") });
       state.charts.combinedChart.options.plugins.legend.display = true;
       state.charts.combinedChart.options.plugins.legend.labels = { color: "#91a9b8", boxWidth: 7, boxHeight: 7, usePointStyle: true, font: { size: 9 } };
       state.charts.combinedChart.update();
@@ -263,11 +330,11 @@
       ["temperatureChart", "Temperature °C", "temperature", "#53d5bd"],
       ["humidityChart", "Humidity %", "humidity", "#50c8e8"],
       ["gasChart", "Gas response ADC", "gas_adc", "#a995ed"],
-      ["ens160Chart", "ENS160 AQI", "aqi", "#ef9b76"],
+      ["ldrChart", "LDR light level ADC", "ldr_adc", "#f4bd69"],
       ["historyTempChart", "Temperature °C", "temperature", "#53d5bd"],
       ["historyHumidityChart", "Humidity %", "humidity", "#50c8e8"],
       ["historyGasChart", "Gas response ADC", "gas_adc", "#a995ed"],
-      ["historyAqiChart", "ENS160 AQI", "aqi", "#ef9b76"]
+      ["historyLdrChart", "LDR light level ADC", "ldr_adc", "#f4bd69"]
     ];
     defs.forEach(([id, label, key, color]) => {
       const el = $("#" + id); if (!el) return;
@@ -281,7 +348,8 @@
       chartFor("historyCombinedChart", { type: "line", data: { labels, datasets: [
         makeDataset("Temperature index", norm("temperature", 18, 36), "#53d5bd", ctx),
         makeDataset("Humidity index", norm("humidity", 25, 90), "#50c8e8", ctx),
-        makeDataset("Gas-response index", norm("gas_adc", 400, 1900), "#a995ed", ctx)
+        makeDataset("Gas-response index", norm("gas_adc", 400, 1900), "#a995ed", ctx),
+        makeDataset("Light-level index", norm("ldr_adc", 0, 4095), "#f4bd69", ctx)
       ] }, options: chartBaseOptions("Normalized index (0–100)", true) });
       state.charts.historyCombinedChart.options.plugins.legend.display = true;
       state.charts.historyCombinedChart.options.plugins.legend.labels = { color: "#91a9b8", boxWidth: 7, boxHeight: 7, usePointStyle: true, font: { size: 9 } };
@@ -300,8 +368,8 @@
   }
   function renderCorrelation() {
     const root = $("#correlationGrid"); if (!root) return;
-    const keys = ["temperature", "humidity", "gas_adc", "aqi"];
-    const names = ["Temp", "Humidity", "Gas ADC", "AQI"];
+    const keys = ["temperature", "humidity", "gas_adc"];
+    const names = ["Temp", "Humidity", "Gas ADC"];
     const h = getRangeHistory(state.range);
     const matrix = keys.map(a => keys.map(b => pearson(h.map(p=>p[a]),h.map(p=>p[b]))));
     root.innerHTML = `<div class="corr-cell header-cell"><strong>Signal</strong></div>${names.map(n=>`<div class="corr-cell header-cell"><strong>${n}</strong></div>`).join("")}${matrix.map((row,i)=>`<div class="corr-cell header-cell"><strong>${names[i]}</strong></div>${row.map(v=>{const opacity=.07+Math.abs(v)*.27;const color=v>=0?`rgba(55,214,189,${opacity})`:`rgba(169,149,237,${opacity})`;return `<div class="corr-cell" style="background:${color}"><strong>${v.toFixed(2)}</strong><span>${v>.65?"Positive":v<-.65?"Negative":"Weak / mixed"}</span></div>`}).join("")}`).join("")}`;
@@ -347,17 +415,12 @@
       temperature: +clamp(last.temperature + (rand() - .47) * .65, 22, 34).toFixed(1),
       humidity: +clamp(last.humidity + (rand() - .48) * 2.2, 40, 82).toFixed(1),
       gas_adc: Math.round(clamp(last.gas_adc + (rand() - .48) * 95, 650, 1700)),
-      ldr_adc: Math.round(clamp((last.ldr_adc ?? 2100) + (rand() - .5) * 80, 0, 4095))
+  ldr_adc: Math.round(clamp((last.ldr_adc ?? 2100) + (rand() - .5) * 80, 0, 4095))
     };
     state.history.push(next);
     if (state.history.length > 240) state.history.shift();
-    state.latest = {
-      ...next,
-      dust_raw: null,
-      aqi: Math.round(clamp(last.aqi + (rand() - .48) * .25, 1, 4)),
-      tvoc: Math.round(clamp(last.tvoc + (rand() - .48) * 14, 50, 350)),
-      eco2: Math.round(clamp(last.eco2 + (rand() - .48) * 22, 450, 900))
-    };
+    state.latest = { ...next };
+    archiveReading(state.latest);
     state.lastUpdated = new Date();
     $("#lastUpdated").textContent = fmtTime(state.lastUpdated);
     renderAll();
@@ -370,9 +433,9 @@
   }
   function refreshDemoQuietly() {
     const last = state.history[state.history.length - 1], rand = Math.random;
-    const next = { timestamp: new Date(), temperature: +clamp(last.temperature + (rand()-.5)*.25,22,34).toFixed(1), humidity: +clamp(last.humidity + (rand()-.5)*.8,40,82).toFixed(1), gas_adc: Math.round(clamp(last.gas_adc+(rand()-.5)*35,650,1700)), ldr_adc: Math.round(clamp((last.ldr_adc??2100)+(rand()-.5)*40,0,4095)) };
+  const next = { timestamp: new Date(), temperature: +clamp(last.temperature + (rand()-.5)*.25,22,34).toFixed(1), humidity: +clamp(last.humidity + (rand()-.5)*.8,40,82).toFixed(1), gas_adc: Math.round(clamp(last.gas_adc+(rand()-.5)*35,650,1700)), ldr_adc: Math.round(clamp((last.ldr_adc??2100)+(rand()-.5)*40,0,4095)) };
     state.history.push(next); if(state.history.length>240)state.history.shift();
-    state.latest={...next,dust_raw:null,aqi:Math.round(clamp(last.aqi+(rand()-.5)*.1,1,4)),tvoc:Math.round(clamp(last.tvoc+(rand()-.5)*7,50,350)),eco2:Math.round(clamp(last.eco2+(rand()-.5)*12,450,900))};state.lastUpdated=new Date();
+    state.latest={...next};state.lastUpdated=new Date();archiveReading(state.latest);
     $("#lastUpdated").textContent=fmtTime(state.lastUpdated);
     renderSensorCards("#sensorCards");renderSensorCards("#monitorSensorCards");renderRisk();renderCharts();renderCorrelation();
   }
@@ -392,19 +455,16 @@
   }
   function answerQuestion(question) {
     const q=question.toLowerCase(), h=state.history, latest=state.latest;
-    const maxTemp=Math.max(...h.map(p=>p.temperature)), maxHum=Math.max(...h.map(p=>p.humidity)), maxGas=Math.max(...h.map(p=>p.gas_adc)), maxAqi=Math.max(...h.map(p=>p.aqi ?? -Infinity));
-    if(q.includes("aqi")||q.includes("air quality")||q.includes("air-quality"))return `The latest ENS160 air-quality index is ${latest.aqi ?? "unavailable"} on the library's 0–5 scale. The retained demo maximum is ${Number.isFinite(maxAqi) ? maxAqi : "unavailable"}. This is sensor output, not a food-safety measurement.`;
-    if(q.includes("tvoc")&&q.includes("eco2"))return `The latest ENS160 readings are ${latest.tvoc ?? "unavailable"} ppb TVOC and ${latest.eco2 ?? "unavailable"} ppm eCO₂. eCO₂ is an equivalent estimate, not a direct CO₂ measurement, and neither value directly measures food spoilage.`;
-    if(q.includes("tvoc"))return `The latest ENS160 TVOC estimate is ${latest.tvoc ?? "unavailable"} ppb. TVOC is an air-quality indicator and does not directly measure food spoilage.`;
-    if(q.includes("eco2")||q.includes("co2"))return `The latest ENS160 eCO₂ estimate is ${latest.eco2 ?? "unavailable"} ppm. It is an equivalent CO₂ estimate, not a direct CO₂ measurement.`;
+    const maxTemp=Math.max(...h.map(p=>p.temperature)), maxHum=Math.max(...h.map(p=>p.humidity)), maxGas=Math.max(...h.map(p=>p.gas_adc));
     if(q.includes("maximum")&&q.includes("temperature"))return `The maximum temperature in the currently retained synthetic sample is ${maxTemp.toFixed(1)} °C. This is generated demo history, not a measured daily maximum.`;
     if(q.includes("humidity")&&(q.includes("increase")||q.includes("when")||q.includes("rise"))){const first=h.findIndex((p,i)=>i>0&&p.humidity-h[i-1].humidity>1.2);return first>=0?`A noticeable upward step appears around ${fmtDateTime(h[first].timestamp)} in the synthetic sample. Current humidity is ${latest.humidity.toFixed(1)}%.`:`No single sharp humidity increase was found in the current demo sample. Current humidity is ${latest.humidity.toFixed(1)}%.`;}
     if(q.includes("gas")||q.includes("adc"))return `The latest MQ-135 demo response is ${latest.gas_adc} raw ADC units. The retained sample maximum is ${maxGas} ADC. Raw ADC is a sensor response, not a calibrated gas concentration.`;
+    if(q.includes("ldr")||q.includes("light"))return `The latest LDR demo reading is ${latest.ldr_adc} raw ADC units. The LDR is not calibrated to a lux measurement.`;
     if(q.includes("risk")||q.includes("indicator")){const r=calculateEnvironmentalRisk(latest,h),c=riskCategory(r.score);return `The prototype indicator is ${r.score}/100 (${c.label}). It combines illustrative temperature deviation, humidity deviation, gas-response variation and persistence weights. It is not a spoilage probability or food-safety measurement.`;}
-    if(q.includes("unusual")||q.includes("sensor")||q.includes("alert"))return `The demo alert list contains ${state.alerts.length} simulated/system events. Examples include a temperature rise, persistent high humidity, gas-response variation, the uninstalled particulate sensor and the inactive device state. No physical sensor has generated these events.`;
+    if(q.includes("unusual")||q.includes("sensor")||q.includes("alert"))return `The demo alert list contains ${state.alerts.length} simulated/system events. Examples include a temperature rise, persistent high humidity, gas-response variation, light-level variation and the inactive device state. No physical sensor has generated these events.`;
     if(q.includes("humidity"))return `Latest demo humidity is ${latest.humidity.toFixed(1)}%. The highest value in the retained synthetic sample is ${maxHum.toFixed(1)}%.`;
     if(q.includes("temperature")||q.includes("warm"))return `Latest demo temperature is ${latest.temperature.toFixed(1)} °C. The highest value in the retained synthetic sample is ${maxTemp.toFixed(1)} °C.`;
-    return "I can answer questions about temperature, humidity, gas ADC, sample maxima, trend changes, simulated alerts and the prototype risk indicator. Try one of the suggested prompts. Remember: this assistant uses local demo data only.";
+    return "I can answer questions about DHT22 temperature and humidity, MQ-135 gas response, LDR light readings, sample maxima, trend changes, simulated alerts and the prototype risk indicator. Try one of the suggested prompts. Remember: this assistant uses local demo data only.";
   }
   function clearChat(){ $("#chatMessages").innerHTML=`<div class="message assistant-message"><div class="message-avatar"><i data-lucide="sparkles"></i></div><div class="message-body"><p>Conversation cleared. Ask me about the AeroFresh demo dataset.</p><small>Local demo response · just now</small></div></div>`;if(window.lucide)lucide.createIcons(); }
 
@@ -432,6 +492,67 @@
     if (status) status.textContent = liveData ? "Live data" : brokerConnected ? "Connected · waiting for data" : state.connection === "connecting" ? "Connecting" : state.connection === "error" ? "Error" : "Not connected";
     const summary = $("#mqttConnectionSummary");
     if (summary) summary.textContent = liveData ? "Connected · live readings active" : brokerConnected ? "Broker connected · awaiting ESP32 telemetry" : state.connection === "error" ? "Error · check configuration and broker logs" : "Demo mode · not connected";
+    renderDoorControl();
+  }
+  function renderDoorControl() {
+    const connected = state.connection === "connected";
+    const pending = state.door.pending;
+    const stateLabel = $("#doorState");
+    const dot = $("#doorStatusDot");
+    const modeLabel = $("#doorModeLabel");
+    const hint = $("#doorHint");
+    const openButton = $("#doorOpen");
+    const closeButton = $("#doorClose");
+    if (!stateLabel) return;
+    stateLabel.textContent = connected && !state.door.confirmedLive ? "Awaiting status" : state.door.status === "open" ? "Open" : "Closed";
+    if (dot) dot.className = `status-dot ${connected && state.door.confirmedLive ? "live-dot" : "demo-dot"}`;
+    if (modeLabel) modeLabel.textContent = connected ? state.door.confirmedLive ? "LIVE STATUS" : "MQTT READY" : "DEMO CONTROL";
+    if (hint) hint.textContent = pending
+      ? `Waiting for MQTT confirmation that the door is ${pending}.`
+      : connected && !state.door.confirmedLive
+        ? "MQTT is connected. Waiting for door_state telemetry before showing a live status."
+        : connected
+        ? "Live commands are sent to the configured MQTT door-command topic. Status changes only after telemetry confirmation."
+        : state.mqttClient
+          ? "MQTT is connecting or unavailable. Door controls are paused until the connection is ready."
+          : "Demo only. Controls change this page locally and do not operate hardware.";
+    if (openButton) openButton.disabled = Boolean(pending || (state.door.confirmedLive && state.door.status === "open") || (state.mqttClient && !connected));
+    if (closeButton) closeButton.disabled = Boolean(pending || (state.door.confirmedLive && state.door.status === "closed") || (state.mqttClient && !connected));
+  }
+  function initDoorControl() {
+    $("#doorOpen")?.addEventListener("click", () => setDoorState("open"));
+    $("#doorClose")?.addEventListener("click", () => setDoorState("closed"));
+    renderDoorControl();
+  }
+  function setDoorState(nextState) {
+    const client = state.mqttClient;
+    if (client && state.connection !== "connected") {
+      showToast("Door control is paused until MQTT connects");
+      return;
+    }
+    if (state.connection === "connected" && client) {
+      const command = JSON.stringify({ device_id: state.mqttConfig.deviceId, command: "door.set", door_state: nextState, timestamp: new Date().toISOString() });
+      state.door.pending = nextState;
+      renderDoorControl();
+      client.publish(`${state.mqttConfig.topic}/door/command`, command, { qos: 0 }, error => {
+        if (!error || state.door.pending !== nextState) return;
+        clearTimeout(state.door.timer);
+        state.door.pending = null;
+        renderDoorControl();
+        showToast("MQTT door command could not be published");
+      });
+      state.door.timer = setTimeout(() => {
+        if (state.door.pending !== nextState) return;
+        state.door.pending = null;
+        renderDoorControl();
+        showToast("No door state confirmation received");
+      }, 10000);
+      return;
+    }
+    state.door.status = nextState;
+    state.door.confirmedLive = false;
+    renderDoorControl();
+    showToast(`Demo door ${nextState}`);
   }
   function readMqttForm() {
     return {
@@ -447,7 +568,7 @@
   function initMqttAdapter() {
     const saved = localStorage.getItem("aerofresh-mqtt-config");
     if (saved) {
-      try { state.mqttConfig = { ...state.mqttConfig, ...JSON.parse(saved) }; } catch (error) { console.warn("[AeroFresh] Ignored invalid saved MQTT settings", error); }
+      try { state.mqttConfig = { ...state.mqttConfig, ...JSON.parse(saved), enabled: false }; } catch (error) { console.warn("[AeroFresh] Ignored invalid saved MQTT settings", error); }
     }
     populateMqttForm();
     $("#mqttForm")?.addEventListener("submit", event => { event.preventDefault(); connectMqtt(readMqttForm()); });
@@ -496,8 +617,11 @@
   }
   function disconnectMqtt(showMessage = true) {
     if (state.mqttClient) { state.mqttClient.end(true); state.mqttClient = null; }
+    clearTimeout(state.door.timer);
+    state.door.pending = null;
     state.mqttConfig.enabled = false;
     setConnection("demo", "Live connection stopped. Demo readings are active.");
+    renderDoorControl();
     if (showMessage) showToast("MQTT disconnected · demo mode active");
   }
   function checkLiveStaleness() {
@@ -505,11 +629,6 @@
       state.mode = "demo";
       setConnection("stale", "No valid reading arrived within the configured timeout; live data is stale.");
     }
-  }
-  function validateOptional(payload, key, min, max) {
-    if (payload[key] == null) return null;
-    const value = Number(payload[key]);
-    return Number.isFinite(value) && value >= min && value <= max ? value : undefined;
   }
   function handleIncomingReading(payload) {
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return console.warn("[AeroFresh] Ignored non-object telemetry");
@@ -524,15 +643,18 @@
     }
     const timestamp = new Date(payload.timestamp);
     if (!payload.timestamp || Number.isNaN(timestamp.getTime())) return console.warn("[AeroFresh] Ignored telemetry with invalid timestamp");
-    for (const [key, range] of Object.entries({ dust_raw: [0, 4095], aqi: [0, 5], tvoc: [0, 65000], eco2: [400, 65000] })) {
-      const value = validateOptional(payload, key, ...range);
-      if (value === undefined) { console.warn(`[AeroFresh] Ignored invalid optional field: ${key}`); return; }
-      values[key] = value;
+    const doorState = typeof payload.door_state === "string" ? payload.door_state.toLowerCase() : "";
+    if (doorState === "open" || doorState === "closed") {
+      state.door.status = doorState;
+      state.door.pending = null;
+      state.door.confirmedLive = true;
+      clearTimeout(state.door.timer);
     }
     const reading = { timestamp, ...values };
     if (state.mode !== "mqtt") { state.history = []; state.alerts = []; }
     state.history.push(reading); if (state.history.length > 1000) state.history.shift();
     state.latest = { ...reading }; state.lastUpdated = new Date(); state.lastLiveUpdate = Date.now(); state.mode = "mqtt"; setConnection("connected"); renderAll();
+    archiveReading(reading);
   }
   function debounce(fn,wait){let timer;return(...args)=>{clearTimeout(timer);timer=setTimeout(()=>fn(...args),wait);};}
 
