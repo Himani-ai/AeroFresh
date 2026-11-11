@@ -1,0 +1,5 @@
+# Local credentials and build artifacts
+firmware/esp32_mqtt_aerofresh/secrets.h
+*.elf
+*.bin
+*.map

@@ -99,7 +99,7 @@ Use **System Information → MQTT integration configuration**:
 4. Click **Connect live MQTT**. The dashboard changes to live mode only after connection and subscription succeed.
 5. Test malformed JSON, wrong device IDs, missing optional sensors, reconnects and stale readings before connecting hardware.
 
-Required message fields are `device_id`, ISO `timestamp`, `temperature` (-40 to 85 °C), `humidity` (0 to 100 %) and `gas_adc` (0 to 4095). Optional fields are `dust_raw` (0 to 4095 raw sensor output), `aqi` (0 to 5), `tvoc` (0 to 65000 ppb) and `eco2` (400 to 65000 ppm estimated equivalent CO₂). Missing optional fields display as unavailable; they are never replaced with zero.
+Required message fields are `device_id`, UTC ISO `timestamp`, `temperature` (-40 to 85 °C), `humidity` (0 to 100 %), `gas_adc` (0 to 4095) and `ldr_adc` (0 to 4095). Optional fields are `dust_raw` (0 to 4095 raw sensor output), `aqi` (0 to 5), `tvoc` (0 to 65000 ppb) and `eco2` (400 to 65000 ppm estimated equivalent CO₂). Missing optional fields display as unavailable; they are never replaced with zero.
 
 **Security warning:** a public static website cannot keep embedded credentials secret. Browser-side MQTT requires narrowly scoped, revocable credentials with read-only access to only the required topic, rate limits and TLS/WSS. Never put administrator credentials, private tokens or long-lived secrets in a public GitHub repository. For production, prefer a backend relay/API that authenticates devices, validates messages and serves authorized data to the frontend.
 
@@ -136,3 +136,9 @@ Source: Callaghan & Martinez Hernandez (2025), University of Bath Research Data 
 ## TinyML banana-ripeness experiments
 
 A lightweight two-track workflow is documented in [tinyml/README.md](tinyml/README.md): a Bath VOC research baseline and a separate ESP32 hardware-specific pipeline for MQ-135, DHT22 and LDR. The research baseline is **not compatible** with the MQ-135. The hardware trainer exports a compact C++ decision-tree header only after real, labelled AeroFresh readings are collected. See the CSV template and collection protocol under `tinyml/data/hardware_template/`.
+
+## ESP32 MQTT live connection
+
+The working ESP32 publisher sketch, installation list, broker setup, wiring defaults and payload contract are in [firmware/esp32_mqtt_aerofresh/README.md](firmware/esp32_mqtt_aerofresh/README.md). The intended flow is ESP32 MQTT/TLS on port 8883 → broker → dashboard MQTT/WSS on the broker's secure WebSocket port. For HiveMQ Cloud Starter, the current guide documents WSS port 8884 and the `/mqtt` path; confirm the endpoint in your own cluster details. Install Arduino IDE 2.x, Espressif ESP32 board package, PubSubClient, Adafruit DHT sensor library and Adafruit Unified Sensor. WiFi/WiFiClientSecure are included in the ESP32 core.
+
+**Hardware safety:** MQ-135 modules are commonly powered at 5 V. Never connect an analog output that can exceed 3.3 V directly to an ESP32 ADC pin; use a suitable voltage divider/conditioning circuit. The sketch defaults are GPIO4 (DHT22), GPIO34 (MQ-135 AO) and GPIO35 (LDR divider midpoint); change them to match the actual wiring. Do not commit `secrets.h` or broker credentials.

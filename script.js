@@ -18,14 +18,15 @@
       reconnectPeriodMs: 3000,
       staleTimeoutMs: 90000
     },
-    demoLatest: { temperature: 28.4, humidity: 61.2, gas_adc: 1240, dust_raw: null, aqi: 2, tvoc: 150, eco2: 650 },
+    demoLatest: { temperature: 28.4, humidity: 61.2, gas_adc: 1240, ldr_adc: 2100, dust_raw: null, aqi: 2, tvoc: 150, eco2: 650 },
     demoSeed: 42
   };
 
   const SENSOR_META = {
     temperature: { label: "Temperature", unit: "°C", sensor: "DHT22", icon: "thermometer", iconClass: "temperature", color: "#53d5bd", min: 20, max: 34 },
     humidity: { label: "Relative humidity", unit: "%", sensor: "DHT22", icon: "droplets", iconClass: "humidity", color: "#50c8e8", min: 35, max: 85 },
-    gas_adc: { label: "MQ-135 gas response", unit: "ADC", sensor: "MQ-135", icon: "wind", iconClass: "gas", color: "#a995ed", min: 500, max: 1800 },
+    gas_adc: { label: "MQ-135 gas response", unit: "ADC", sensor: "MQ-135", icon: "wind", iconClass: "gas", color: "#a995ed", min: 0, max: 4095 },
+    ldr_adc: { label: "Ambient light response", unit: "ADC", sensor: "LDR", icon: "sun", iconClass: "light", color: "#e6bd7e", min: 0, max: 4095 },
     dust_raw: { label: "Particulate sensor output", unit: "ADC", sensor: "GP2Y1014", icon: "cloud-fog", iconClass: "particle", color: "#e6bd7e", min: 0, max: 4095 },
     aqi: { label: "ENS160 air-quality index", unit: "AQI", sensor: "ENS160", icon: "gauge", iconClass: "aqi", color: "#ef9b76", min: 0, max: 5 },
     tvoc: { label: "ENS160 TVOC", unit: "ppb", sensor: "ENS160", icon: "flask-conical", iconClass: "tvoc", color: "#d49be8", min: 0, max: 65000 },
@@ -60,6 +61,7 @@
         temperature: +temperature.toFixed(1),
         humidity: +clamp(humidity, 35, 85).toFixed(1),
         gas_adc: Math.round(clamp(gas, 500, 1800)),
+        ldr_adc: Math.round(clamp(2100 + (rand() - .5) * 500, 0, 4095)),
         dust_raw: null,
         aqi: Math.round(clamp(1.7 + Math.sin(phase * .7) * .8 + (rand() - .5) * .7, 1, 4)),
         tvoc: Math.round(clamp(125 + Math.sin(phase * .9) * 55 + (rand() - .5) * 35, 50, 350)),
@@ -142,7 +144,7 @@
     root.innerHTML = Object.entries(SENSOR_META).map(([key, meta]) => {
       const value = state.latest[key];
       const missing = value == null;
-      const display = missing ? "—" : (["gas_adc", "dust_raw", "aqi", "tvoc", "eco2"].includes(key) ? Math.round(value).toLocaleString() : Number(value).toFixed(1));
+      const display = missing ? "—" : (["gas_adc", "ldr_adc", "dust_raw", "aqi", "tvoc", "eco2"].includes(key) ? Math.round(value).toLocaleString() : Number(value).toFixed(1));
       const trend = getTrend(key);
       return `<article class="sensor-card">
         <div class="sensor-card-top"><span class="sensor-icon ${meta.iconClass}"><i data-lucide="${meta.icon}"></i></span><span class="sensor-state"><b class="status-dot ${state.mode === "mqtt" ? "live-dot" : "demo-dot"}"></b>${missing ? "UNAVAILABLE" : state.mode === "mqtt" ? "LIVE DATA" : "DEMO DATA"}</span></div>
@@ -161,7 +163,7 @@
     const previous = h[h.length - 2][key];
     if (!Number.isFinite(previous)) return { label: "New reading", symbol: "•", className: "trend-neutral" };
     const delta = state.latest[key] - previous;
-    const threshold = key === "gas_adc" ? 25 : .25;
+    const threshold = ["gas_adc", "ldr_adc"].includes(key) ? 25 : .25;
     if (Math.abs(delta) < threshold) return { label: "Stable", symbol: "→", className: "trend-neutral" };
     return delta > 0 ? { label: "Trending up", symbol: "↗", className: "trend-up" } : { label: "Trending down", symbol: "↘", className: "trend-down" };
   }
@@ -344,7 +346,8 @@
       timestamp: new Date(),
       temperature: +clamp(last.temperature + (rand() - .47) * .65, 22, 34).toFixed(1),
       humidity: +clamp(last.humidity + (rand() - .48) * 2.2, 40, 82).toFixed(1),
-      gas_adc: Math.round(clamp(last.gas_adc + (rand() - .48) * 95, 650, 1700))
+      gas_adc: Math.round(clamp(last.gas_adc + (rand() - .48) * 95, 650, 1700)),
+      ldr_adc: Math.round(clamp((last.ldr_adc ?? 2100) + (rand() - .5) * 80, 0, 4095))
     };
     state.history.push(next);
     if (state.history.length > 240) state.history.shift();
@@ -367,7 +370,7 @@
   }
   function refreshDemoQuietly() {
     const last = state.history[state.history.length - 1], rand = Math.random;
-    const next = { timestamp: new Date(), temperature: +clamp(last.temperature + (rand()-.5)*.25,22,34).toFixed(1), humidity: +clamp(last.humidity + (rand()-.5)*.8,40,82).toFixed(1), gas_adc: Math.round(clamp(last.gas_adc+(rand()-.5)*35,650,1700)) };
+    const next = { timestamp: new Date(), temperature: +clamp(last.temperature + (rand()-.5)*.25,22,34).toFixed(1), humidity: +clamp(last.humidity + (rand()-.5)*.8,40,82).toFixed(1), gas_adc: Math.round(clamp(last.gas_adc+(rand()-.5)*35,650,1700)), ldr_adc: Math.round(clamp((last.ldr_adc??2100)+(rand()-.5)*40,0,4095)) };
     state.history.push(next); if(state.history.length>240)state.history.shift();
     state.latest={...next,dust_raw:null,aqi:Math.round(clamp(last.aqi+(rand()-.5)*.1,1,4)),tvoc:Math.round(clamp(last.tvoc+(rand()-.5)*7,50,350)),eco2:Math.round(clamp(last.eco2+(rand()-.5)*12,450,900))};state.lastUpdated=new Date();
     $("#lastUpdated").textContent=fmtTime(state.lastUpdated);
@@ -411,23 +414,24 @@
     renderConnectionState(message);
   }
   function renderConnectionState(message) {
-    const connected = state.connection === "connected" && state.mode === "mqtt";
-    const label = connected ? "LIVE MQTT" : state.connection === "connecting" ? "CONNECTING" : "DEMO MODE";
+    const brokerConnected = state.connection === "connected";
+    const liveData = brokerConnected && state.mode === "mqtt";
+    const label = liveData ? "LIVE MQTT" : brokerConnected ? "MQTT READY" : state.connection === "connecting" ? "CONNECTING" : "DEMO MODE";
     const modeLabel = $("#modeLabel");
     if (modeLabel) modeLabel.textContent = label;
     const pill = $("#modePill");
-    if (pill) pill.classList.toggle("live-mode-pill", connected);
+    if (pill) pill.classList.toggle("live-mode-pill", liveData);
     const notice = $("#connectionNotice");
     if (notice) {
       const title = notice.querySelector("strong");
       const detail = notice.querySelector("span");
-      title.textContent = connected ? "Live MQTT connection established." : state.connection === "error" ? "MQTT connection error." : "Hardware is not connected.";
-      detail.textContent = message || (connected ? `Receiving validated readings for ${state.mqttConfig.deviceId}.` : "These values are generated locally for demonstration. Configure MQTT in System Information to receive validated ESP32 readings.");
+      title.textContent = liveData ? "Live MQTT telemetry received." : brokerConnected ? "MQTT broker connected." : state.connection === "error" ? "MQTT connection error." : "Hardware is not connected.";
+      detail.textContent = message || (liveData ? `Receiving validated readings for ${state.mqttConfig.deviceId}.` : brokerConnected ? "Subscribed successfully; waiting for the first valid ESP32 reading." : "These values are generated locally for demonstration. Configure MQTT in System Information to receive validated ESP32 readings.");
     }
     const status = $("#mqttState");
-    if (status) status.textContent = connected ? "Connected" : state.connection === "connecting" ? "Connecting" : state.connection === "error" ? "Error" : "Not connected";
+    if (status) status.textContent = liveData ? "Live data" : brokerConnected ? "Connected · waiting for data" : state.connection === "connecting" ? "Connecting" : state.connection === "error" ? "Error" : "Not connected";
     const summary = $("#mqttConnectionSummary");
-    if (summary) summary.textContent = connected ? "Connected · live readings active" : state.connection === "error" ? "Error · check configuration and broker logs" : "Demo mode · not connected";
+    if (summary) summary.textContent = liveData ? "Connected · live readings active" : brokerConnected ? "Broker connected · awaiting ESP32 telemetry" : state.connection === "error" ? "Error · check configuration and broker logs" : "Demo mode · not connected";
   }
   function readMqttForm() {
     return {
@@ -449,7 +453,7 @@
     $("#mqttForm")?.addEventListener("submit", event => { event.preventDefault(); connectMqtt(readMqttForm()); });
     $("#mqttDisconnect")?.addEventListener("click", disconnectMqtt);
     if ($("#mqttBrokerSummary")) $("#mqttBrokerSummary").textContent = state.mqttConfig.brokerUrl || "Not configured";
-    if (state.mqttConfig.enabled && state.mqttConfig.brokerUrl) connectMqtt(state.mqttConfig);
+    // Never auto-connect on page load: the password is intentionally session-only.
   }
   function populateMqttForm() {
     ["brokerUrl", "topic", "deviceId", "username", "password"].forEach(key => {
@@ -468,20 +472,21 @@
     }
     disconnectMqtt(false);
     state.mqttConfig = { ...config, enabled: true };
-    if ($("#mqttRemember")?.checked) localStorage.setItem("aerofresh-mqtt-config", JSON.stringify(state.mqttConfig));
+    if ($("#mqttRemember")?.checked) { const safeConfig = { brokerUrl: config.brokerUrl, topic: config.topic, deviceId: config.deviceId }; localStorage.setItem("aerofresh-mqtt-config", JSON.stringify(safeConfig)); } else { localStorage.removeItem("aerofresh-mqtt-config"); }
     if ($("#mqttBrokerSummary")) $("#mqttBrokerSummary").textContent = config.brokerUrl;
     if ($("#mqttTopicSummary")) $("#mqttTopicSummary").textContent = config.topic;
+    state.lastLiveUpdate = null;
     setConnection("connecting", "Connecting securely to the configured MQTT broker.");
     try {
       const client = window.mqtt.connect(config.brokerUrl, { username: config.username || undefined, password: config.password || undefined, reconnectPeriod: config.reconnectPeriodMs, connectTimeout: 10000, clean: true });
       state.mqttClient = client;
       client.on("connect", () => client.subscribe(config.topic, { qos: 0 }, error => {
         if (error) { console.error("[AeroFresh] MQTT subscribe failed", error); setConnection("error", "Connected, but subscription was refused. Check topic permissions."); return; }
-        state.mode = "mqtt"; setConnection("connected"); showToast("MQTT connected · live mode active");
+        setConnection("connected", "Broker connected and subscribed; waiting for the first valid ESP32 reading."); showToast("MQTT broker connected · waiting for ESP32 data");
       }));
       client.on("message", (topic, payload) => {
         if (topic !== config.topic) return;
-        try { handleIncomingReading(JSON.parse(payload.toString())); } catch (error) { console.warn("[AeroFresh] Invalid MQTT JSON message", error); showToast("Ignored malformed MQTT JSON"); }
+        try { const text = typeof payload === "string" ? payload : new TextDecoder("utf-8").decode(payload); handleIncomingReading(JSON.parse(text)); } catch (error) { console.warn("[AeroFresh] Invalid MQTT JSON message", error); showToast("Ignored malformed MQTT JSON"); }
       });
       client.on("reconnect", () => setConnection("connecting", "MQTT connection interrupted; retrying securely."));
       client.on("offline", () => setConnection("offline", "MQTT is offline; data is marked stale until a valid reading arrives."));
@@ -510,7 +515,7 @@
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return console.warn("[AeroFresh] Ignored non-object telemetry");
     const cfg = state.mqttConfig;
     if (payload.device_id !== cfg.deviceId) return console.warn("[AeroFresh] Ignored telemetry for another device");
-    const required = { temperature: [-40, 85], humidity: [0, 100], gas_adc: [0, 4095] };
+    const required = { temperature: [-40, 85], humidity: [0, 100], gas_adc: [0, 4095], ldr_adc: [0, 4095] };
     const values = {};
     for (const [key, [min, max]] of Object.entries(required)) {
       const value = Number(payload[key]);
@@ -525,6 +530,7 @@
       values[key] = value;
     }
     const reading = { timestamp, ...values };
+    if (state.mode !== "mqtt") { state.history = []; state.alerts = []; }
     state.history.push(reading); if (state.history.length > 1000) state.history.shift();
     state.latest = { ...reading }; state.lastUpdated = new Date(); state.lastLiveUpdate = Date.now(); state.mode = "mqtt"; setConnection("connected"); renderAll();
   }
