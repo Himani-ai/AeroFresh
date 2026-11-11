@@ -416,7 +416,7 @@
     const modeLabel = $("#modeLabel");
     if (modeLabel) modeLabel.textContent = label;
     const pill = $("#modePill");
-    if (pill) pill.classList.toggle("live-mode-pill", connected);
+    if (pill) pill.classList.toggle("live-mode-pill", liveData);
     const notice = $("#connectionNotice");
     if (notice) {
       const title = notice.querySelector("strong");
@@ -425,9 +425,9 @@
       detail.textContent = message || (connected ? `Receiving validated readings for ${state.mqttConfig.deviceId}.` : "These values are generated locally for demonstration. Configure MQTT in System Information to receive validated ESP32 readings.");
     }
     const status = $("#mqttState");
-    if (status) status.textContent = connected ? "Connected" : state.connection === "connecting" ? "Connecting" : state.connection === "error" ? "Error" : "Not connected";
+    if (status) status.textContent = liveData ? "Live data" : brokerConnected ? "Connected · waiting for data" : state.connection === "connecting" ? "Connecting" : state.connection === "error" ? "Error" : "Not connected";
     const summary = $("#mqttConnectionSummary");
-    if (summary) summary.textContent = connected ? "Connected · live readings active" : state.connection === "error" ? "Error · check configuration and broker logs" : "Demo mode · not connected";
+    if (summary) summary.textContent = liveData ? "Connected · live readings active" : brokerConnected ? "Broker connected · awaiting ESP32 telemetry" : state.connection === "error" ? "Error · check configuration and broker logs" : "Demo mode · not connected";
   }
   function readMqttForm() {
     return {
@@ -477,7 +477,7 @@
       state.mqttClient = client;
       client.on("connect", () => client.subscribe(config.topic, { qos: 0 }, error => {
         if (error) { console.error("[AeroFresh] MQTT subscribe failed", error); setConnection("error", "Connected, but subscription was refused. Check topic permissions."); return; }
-        state.mode = "mqtt"; setConnection("connected"); showToast("MQTT connected · live mode active");
+        setConnection("connected", "Broker connected and subscribed; waiting for the first valid ESP32 reading."); showToast("MQTT broker connected · waiting for ESP32 data");
       }));
       client.on("message", (topic, payload) => {
         if (topic !== config.topic) return;
