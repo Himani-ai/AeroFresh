@@ -25,7 +25,8 @@
   const SENSOR_META = {
     temperature: { label: "Temperature", unit: "°C", sensor: "DHT22", icon: "thermometer", iconClass: "temperature", color: "#53d5bd", min: 20, max: 34 },
     humidity: { label: "Relative humidity", unit: "%", sensor: "DHT22", icon: "droplets", iconClass: "humidity", color: "#50c8e8", min: 35, max: 85 },
-    gas_adc: { label: "MQ-135 gas response", unit: "ADC", sensor: "MQ-135", icon: "wind", iconClass: "gas", color: "#a995ed", min: 0, max: 4095 },\n    ldr_adc: { label: "Ambient light response", unit: "ADC", sensor: "LDR", icon: "sun", iconClass: "light", color: "#e6bd7e", min: 0, max: 4095 },
+    gas_adc: { label: "MQ-135 gas response", unit: "ADC", sensor: "MQ-135", icon: "wind", iconClass: "gas", color: "#a995ed", min: 0, max: 4095 },
+    ldr_adc: { label: "Ambient light response", unit: "ADC", sensor: "LDR", icon: "sun", iconClass: "light", color: "#e6bd7e", min: 0, max: 4095 },
     dust_raw: { label: "Particulate sensor output", unit: "ADC", sensor: "GP2Y1014", icon: "cloud-fog", iconClass: "particle", color: "#e6bd7e", min: 0, max: 4095 },
     aqi: { label: "ENS160 air-quality index", unit: "AQI", sensor: "ENS160", icon: "gauge", iconClass: "aqi", color: "#ef9b76", min: 0, max: 5 },
     tvoc: { label: "ENS160 TVOC", unit: "ppb", sensor: "ENS160", icon: "flask-conical", iconClass: "tvoc", color: "#d49be8", min: 0, max: 65000 },
@@ -59,7 +60,8 @@
         timestamp: t,
         temperature: +temperature.toFixed(1),
         humidity: +clamp(humidity, 35, 85).toFixed(1),
-        gas_adc: Math.round(clamp(gas, 500, 1800)),\n        ldr_adc: Math.round(clamp(2100 + (rand() - .5) * 500, 0, 4095)),
+        gas_adc: Math.round(clamp(gas, 500, 1800)),
+        ldr_adc: Math.round(clamp(2100 + (rand() - .5) * 500, 0, 4095)),
         dust_raw: null,
         aqi: Math.round(clamp(1.7 + Math.sin(phase * .7) * .8 + (rand() - .5) * .7, 1, 4)),
         tvoc: Math.round(clamp(125 + Math.sin(phase * .9) * 55 + (rand() - .5) * 35, 50, 350)),
@@ -411,8 +413,9 @@
     renderConnectionState(message);
   }
   function renderConnectionState(message) {
-    const connected = state.connection === "connected" && state.mode === "mqtt";
-    const label = connected ? "LIVE MQTT" : state.connection === "connecting" ? "CONNECTING" : "DEMO MODE";
+    const brokerConnected = state.connection === "connected";
+    const liveData = brokerConnected && state.mode === "mqtt";
+    const label = liveData ? "LIVE MQTT" : brokerConnected ? "MQTT READY" : state.connection === "connecting" ? "CONNECTING" : "DEMO MODE";
     const modeLabel = $("#modeLabel");
     if (modeLabel) modeLabel.textContent = label;
     const pill = $("#modePill");
@@ -421,8 +424,8 @@
     if (notice) {
       const title = notice.querySelector("strong");
       const detail = notice.querySelector("span");
-      title.textContent = connected ? "Live MQTT connection established." : state.connection === "error" ? "MQTT connection error." : "Hardware is not connected.";
-      detail.textContent = message || (connected ? `Receiving validated readings for ${state.mqttConfig.deviceId}.` : "These values are generated locally for demonstration. Configure MQTT in System Information to receive validated ESP32 readings.");
+      title.textContent = liveData ? "Live MQTT telemetry received." : brokerConnected ? "MQTT broker connected." : state.connection === "error" ? "MQTT connection error." : "Hardware is not connected.";
+      detail.textContent = message || (liveData ? `Receiving validated readings for ${state.mqttConfig.deviceId}.` : brokerConnected ? "Subscribed successfully; waiting for the first valid ESP32 reading." : "These values are generated locally for demonstration. Configure MQTT in System Information to receive validated ESP32 readings.");
     }
     const status = $("#mqttState");
     if (status) status.textContent = liveData ? "Live data" : brokerConnected ? "Connected · waiting for data" : state.connection === "connecting" ? "Connecting" : state.connection === "error" ? "Error" : "Not connected";
@@ -471,6 +474,7 @@
     if ($("#mqttRemember")?.checked) { const safeConfig = { brokerUrl: config.brokerUrl, topic: config.topic, deviceId: config.deviceId, username: config.username || "" }; localStorage.setItem("aerofresh-mqtt-config", JSON.stringify(safeConfig)); } else { localStorage.removeItem("aerofresh-mqtt-config"); }
     if ($("#mqttBrokerSummary")) $("#mqttBrokerSummary").textContent = config.brokerUrl;
     if ($("#mqttTopicSummary")) $("#mqttTopicSummary").textContent = config.topic;
+    state.lastLiveUpdate = null;
     setConnection("connecting", "Connecting securely to the configured MQTT broker.");
     try {
       const client = window.mqtt.connect(config.brokerUrl, { username: config.username || undefined, password: config.password || undefined, reconnectPeriod: config.reconnectPeriodMs, connectTimeout: 10000, clean: true });
@@ -525,6 +529,7 @@
       values[key] = value;
     }
     const reading = { timestamp, ...values };
+    if (state.mode !== "mqtt") { state.history = []; state.alerts = []; }
     state.history.push(reading); if (state.history.length > 1000) state.history.shift();
     state.latest = { ...reading }; state.lastUpdated = new Date(); state.lastLiveUpdate = Date.now(); state.mode = "mqtt"; setConnection("connected"); renderAll();
   }
