@@ -68,9 +68,7 @@ bool connectMQTT() {
   if (WiFi.status() != WL_CONNECTED) return false;
   String clientId = String(DEVICE_ID) + "-" + String((uint32_t)ESP.getEfuseMac(), HEX);
   Serial.printf("Connecting MQTT to %s:%u ...\n", MQTT_HOST, MQTT_TLS_PORT);
-  if (mqtt.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD,
-                   "aerofresh/status", 0, true, "offline")) {
-    mqtt.publish("aerofresh/status", "online", true);
+  if (mqtt.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD)) {
     Serial.printf("MQTT connected. Publishing to %s\n", MQTT_TOPIC);
     return true;
   }
