@@ -1,0 +1,55 @@
+{
+  "track": "research_only",
+  "dataset": "University of Bath VOC",
+  "features": [
+    "TGS20",
+    "TGS02",
+    "SGP"
+  ],
+  "warning": "TGS2620/TGS2602/SGP40 are not MQ-135; do not flash on AeroFresh ESP32.",
+  "model": "DecisionTreeClassifier(max_depth=4,min_samples_leaf=100,class_weight=balanced)",
+  "train_rows": 18819,
+  "test_rows": 8066,
+  "tree_depth": 4,
+  "leaf_count": 16,
+  "accuracy": 0.8507314654103645,
+  "balanced_accuracy": 0.8507439169511043,
+  "confusion_matrix_labels_1_to_5": [
+    [
+      1408,
+      205,
+      0,
+      0,
+      0
+    ],
+    [
+      12,
+      1584,
+      17,
+      0,
+      0
+    ],
+    [
+      5,
+      403,
+      1185,
+      20,
+      0
+    ],
+    [
+      0,
+      1,
+      80,
+      1474,
+      58
+    ],
+    [
+      0,
+      1,
+      2,
+      400,
+      1211
+    ]
+  ],
+  "evaluation_note": "Evaluation on the supplied sample-level split. Time-adjacent observations from the same monitoring tests may occur in both subsets; this does not establish generalization to a new banana bunch."
+}
