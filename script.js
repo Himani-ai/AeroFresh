@@ -346,7 +346,8 @@
       timestamp: new Date(),
       temperature: +clamp(last.temperature + (rand() - .47) * .65, 22, 34).toFixed(1),
       humidity: +clamp(last.humidity + (rand() - .48) * 2.2, 40, 82).toFixed(1),
-      gas_adc: Math.round(clamp(last.gas_adc + (rand() - .48) * 95, 650, 1700)),\n      ldr_adc: Math.round(clamp((last.ldr_adc ?? 2100) + (rand() - .5) * 80, 0, 4095))
+      gas_adc: Math.round(clamp(last.gas_adc + (rand() - .48) * 95, 650, 1700)),
+      ldr_adc: Math.round(clamp((last.ldr_adc ?? 2100) + (rand() - .5) * 80, 0, 4095))
     };
     state.history.push(next);
     if (state.history.length > 240) state.history.shift();
