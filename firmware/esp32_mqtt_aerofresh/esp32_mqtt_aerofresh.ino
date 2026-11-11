@@ -1,14 +1,17 @@
 /*
- * AeroFresh ESP32 -> MQTT/TLS publisher
+ * AeroFresh ESP32 -> FreeMQTT public broker publisher (prototype transport).
  * Board: ESP32 Dev Module (Arduino IDE)
  * Sensors: DHT22 module, MQ-135 analog output, LDR voltage divider.
  *
+ * FreeMQTT is a shared public broker. This sketch uses plain MQTT/TCP on
+ * port 1883 for the easiest prototype connection. Do not send private data.
+ * For production, use a private broker with authenticated TLS.
+ *
  * IMPORTANT: use a voltage divider/level conditioning on MQ-135 AO so ESP32
  * ADC pin never exceeds 3.3 V. Never connect a 5 V analog output directly.
- * Copy secrets.h.example to secrets.h and fill in private settings.
+ * Copy secrets.h.example to secrets.h and add your own Wi-Fi credentials.
  */
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <DHT.h>
 #include <time.h>
@@ -20,12 +23,12 @@
 #define LDR_PIN 35
 
 static const char *DEVICE_ID = "aerofresh-esp32-01";
-static const char *MQTT_TOPIC = "aerofresh/telemetry";
+static const char *MQTT_TOPIC = "aerofresh/himani-ai/device01/telemetry";
 static const uint32_t PUBLISH_INTERVAL_MS = 15000;
 static const uint32_t WIFI_RETRY_MS = 10000;
 
-WiFiClientSecure tlsClient;
-PubSubClient mqtt(tlsClient);
+WiFiClient networkClient;
+PubSubClient mqtt(networkClient);
 DHT dht(DHT_PIN, DHT_TYPE);
 uint32_t lastPublish = 0;
 uint32_t lastWifiAttempt = 0;
@@ -67,7 +70,7 @@ bool connectMQTT() {
   if (mqtt.connected()) return true;
   if (WiFi.status() != WL_CONNECTED) return false;
   String clientId = String(DEVICE_ID) + "-" + String((uint32_t)ESP.getEfuseMac(), HEX);
-  Serial.printf("Connecting MQTT to %s:%u ...\n", MQTT_HOST, MQTT_TLS_PORT);
+  Serial.printf("Connecting MQTT to %s:%u ...\n", MQTT_HOST, MQTT_PORT);
   if (mqtt.connect(clientId.c_str(), MQTT_USERNAME, MQTT_PASSWORD)) {
     Serial.printf("MQTT connected. Publishing to %s\n", MQTT_TOPIC);
     return true;
@@ -122,10 +125,7 @@ void setup() {
   analogSetPinAttenuation(LDR_PIN, ADC_11db);
   dht.begin();
 
-  // Verify the broker hostname against its CA chain. Do not use setInsecure()
-  // for a real deployment.
-  tlsClient.setCACert(MQTT_ROOT_CA);
-  mqtt.setServer(MQTT_HOST, MQTT_TLS_PORT);
+  mqtt.setServer(MQTT_HOST, MQTT_PORT);
   mqtt.setBufferSize(512);
   mqtt.setKeepAlive(30);
   connectWiFi();
