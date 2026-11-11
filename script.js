@@ -18,15 +18,15 @@
       reconnectPeriodMs: 3000,
       staleTimeoutMs: 90000
     },
-  demoLatest: { temperature: 28.4, humidity: 61.2, gas_adc: 1240, ldr_adc: 2100 },
+    demoLatest: { temperature: 28.4, humidity: 61.2, gas_adc: 1240, ldr_adc: 2100 },
     demoSeed: 42
   };
 
   const SENSOR_META = {
     temperature: { label: "Temperature", unit: "°C", sensor: "DHT22", icon: "thermometer", iconClass: "temperature", color: "#53d5bd", min: 20, max: 34 },
     humidity: { label: "Relative humidity", unit: "%", sensor: "DHT22", icon: "droplets", iconClass: "humidity", color: "#50c8e8", min: 35, max: 85 },
-  gas_adc: { label: "MQ-135 gas response", unit: "ADC", sensor: "MQ-135", icon: "wind", iconClass: "gas", color: "#a995ed", min: 0, max: 4095 },
-  ldr_adc: { label: "LDR light level", unit: "ADC", sensor: "LDR", icon: "sun", iconClass: "light", color: "#f4bd69", min: 0, max: 4095 }
+    gas_adc: { label: "MQ-135 gas response", unit: "ADC", sensor: "MQ-135", icon: "wind", iconClass: "gas", color: "#a995ed", min: 0, max: 4095 },
+    ldr_adc: { label: "LDR light level", unit: "ADC", sensor: "LDR", icon: "sun", iconClass: "light", color: "#f4bd69", min: 0, max: 4095 }
   };
 
   const EDGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
