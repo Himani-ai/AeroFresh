@@ -122,3 +122,10 @@ Python, Pandas and machine-learning analytics are planned future work, not curre
 ## License
 
 Add a license file if you intend to publish or reuse this project under explicit terms.
+
+
+## ESP32 MQTT live connection
+
+The working ESP32 publisher sketch, installation list, broker setup, wiring defaults and payload contract are in [firmware/esp32_mqtt_aerofresh/README.md](firmware/esp32_mqtt_aerofresh/README.md). The intended flow is ESP32 MQTT/TLS on port 8883 → broker → dashboard MQTT/WSS on the broker's secure WebSocket port. For HiveMQ Cloud Starter, the current guide documents WSS port 8884 and the `/mqtt` path; confirm the endpoint in your own cluster details. Install Arduino IDE 2.x, Espressif ESP32 board package, PubSubClient, Adafruit DHT sensor library and Adafruit Unified Sensor. WiFi/WiFiClientSecure are included in the ESP32 core.
+
+**Hardware safety:** MQ-135 modules are commonly powered at 5 V. Never connect an analog output that can exceed 3.3 V directly to an ESP32 ADC pin; use a suitable voltage divider/conditioning circuit. The sketch defaults are GPIO4 (DHT22), GPIO34 (MQ-135 AO) and GPIO35 (LDR divider midpoint); change them to match the actual wiring. Do not commit `secrets.h` or broker credentials.
