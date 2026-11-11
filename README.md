@@ -122,3 +122,17 @@ Python, Pandas and machine-learning analytics are planned future work, not curre
 ## License
 
 Add a license file if you intend to publish or reuse this project under explicit terms.
+
+
+## Banana ripeness research data
+
+A reproducible preprocessing workflow and data dictionary for the University of Bath banana-ripeness VOC and TPHiS datasets are available in [datasets/banana-ripeness](datasets/banana-ripeness/README.md). The script at [scripts/preprocess_banana_data.py](scripts/preprocess_banana_data.py) validates feature/label indices, preserves the source train/test split, adds the five published ripeness labels, and writes cleaned CSVs plus a quality report.
+
+Source: Callaghan & Martinez Hernandez (2025), University of Bath Research Data Archive, DOI [10.15125/BATH-01459](https://doi.org/10.15125/BATH-01459), CC BY 4.0.
+
+**Research-data caveat:** the Bath VOC channels are TGS2620, TGS2602 and SGP40 (not MQ-135); TPHiS contains BME280 and spectral readings (not DHT22/MQ-135). These are offline research features, not AeroFresh ESP32 telemetry. Collect and validate paired local banana observations before claiming that a model trained on this external data predicts from the project's MQ-135.
+
+
+## TinyML banana-ripeness experiments
+
+A lightweight two-track workflow is documented in [tinyml/README.md](tinyml/README.md): a Bath VOC research baseline and a separate ESP32 hardware-specific pipeline for MQ-135, DHT22 and LDR. The research baseline is **not compatible** with the MQ-135. The hardware trainer exports a compact C++ decision-tree header only after real, labelled AeroFresh readings are collected. See the CSV template and collection protocol under `tinyml/data/hardware_template/`.
