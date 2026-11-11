@@ -99,7 +99,7 @@ Use **System Information → MQTT integration configuration**:
 4. Click **Connect live MQTT**. The dashboard changes to live mode only after connection and subscription succeed.
 5. Test malformed JSON, wrong device IDs, missing optional sensors, reconnects and stale readings before connecting hardware.
 
-Required message fields are `device_id`, ISO `timestamp`, `temperature` (-40 to 85 °C), `humidity` (0 to 100 %) and `gas_adc` (0 to 4095). Optional fields are `dust_raw` (0 to 4095 raw sensor output), `aqi` (0 to 5), `tvoc` (0 to 65000 ppb) and `eco2` (400 to 65000 ppm estimated equivalent CO₂). Missing optional fields display as unavailable; they are never replaced with zero.
+Required message fields are `device_id`, UTC ISO `timestamp`, `temperature` (-40 to 85 °C), `humidity` (0 to 100 %), `gas_adc` (0 to 4095) and `ldr_adc` (0 to 4095). Optional fields are `dust_raw` (0 to 4095 raw sensor output), `aqi` (0 to 5), `tvoc` (0 to 65000 ppb) and `eco2` (400 to 65000 ppm estimated equivalent CO₂). Missing optional fields display as unavailable; they are never replaced with zero.
 
 **Security warning:** a public static website cannot keep embedded credentials secret. Browser-side MQTT requires narrowly scoped, revocable credentials with read-only access to only the required topic, rate limits and TLS/WSS. Never put administrator credentials, private tokens or long-lived secrets in a public GitHub repository. For production, prefer a backend relay/API that authenticates devices, validates messages and serves authorized data to the frontend.
 
