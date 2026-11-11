@@ -1,73 +1,80 @@
-# ESP32 MQTT connection setup
+# AeroFresh ESP32 + FreeMQTT setup
 
-## Architecture
+## Connection architecture
 
-- ESP32 publishes to the broker using MQTT over TLS (TCP 8883).
-- The AeroFresh browser dashboard subscribes using MQTT over secure WebSockets (WSS).
-- Both use the same broker hostname, credentials (prefer separate accounts), and topic: `aerofresh/telemetry`.
+- ESP32 publishes MQTT over TCP to `broker.freemqtt.com:1883`.
+- AeroFresh website subscribes over secure WebSockets at `wss://broker.freemqtt.com:8084/mqtt`.
+- Topic: `aerofresh/himani-ai/device01/telemetry`.
+- Device ID: `aerofresh-esp32-01`.
+- Public broker credentials: username `freemqtt`, password `public`.
 
-For a simple managed broker, HiveMQ Cloud Starter is a straightforward choice. Its current quick-start guide documents secure WebSocket access on port 8884. Check your cluster's own connection details; do not assume every broker uses the same WSS path/port. See https://docs.hivemq.com/hivemq-cloud/quick-start-guide.html.
+These are the public connection details currently published by [FreeMQTT](https://www.freemqtt.com/). The broker is shared and intended only for learning, testing and prototyping. Assume messages/topics are visible to other users; do not publish personal data, Wi-Fi credentials or private information. Its service has no uptime guarantee and may restart.
 
-## Install
+**Transport note:** this prototype uses unencrypted MQTT/TCP on port 1883 from the ESP32 to avoid hardcoding an unverified CA certificate. The browser uses WSS. This is acceptable only for non-sensitive prototype telemetry on a public broker. For production, move to a private broker with TLS and device-specific credentials.
 
-1. Install **Arduino IDE 2.x**.
-2. In Arduino IDE → Settings → Additional Boards Manager URLs, add Espressif's official ESP32 package URL: `https://espressif.github.io/arduino-esp32/package_esp32_index.json`.
-3. Open Boards Manager, search **esp32**, install **esp32 by Espressif Systems**. Select your exact ESP32 board (for a common DevKit, choose **ESP32 Dev Module**).
-4. Open Library Manager and install:
+## 1. Install software
+
+1. Install Arduino IDE 2.x.
+2. In Arduino IDE → Settings → Additional Boards Manager URLs, add `https://espressif.github.io/arduino-esp32/package_esp32_index.json`.
+3. Open Boards Manager, search `esp32`, and install **esp32 by Espressif Systems**.
+4. Select your actual board (for a common DevKit, **ESP32 Dev Module**).
+5. In Library Manager install:
    - **PubSubClient** by Nick O'Leary
    - **DHT sensor library** by Adafruit
-   - **Adafruit Unified Sensor** by Adafruit
-5. `WiFi.h`, `WiFiClientSecure.h`, `time.h` are provided by the ESP32 core; do not install separate libraries for them.
-6. Open `esp32_mqtt_aerofresh.ino`. Copy `secrets.h.example` to `secrets.h` in the same sketch folder and fill Wi-Fi, broker username/password, host and the broker root CA certificate. The real `secrets.h` is gitignored.
-7. Choose the correct board and COM/USB port, upload, then open Serial Monitor at **115200 baud**.
+   - **Adafruit Unified Sensor**
 
-## Pin defaults in the sketch
+## 2. Prepare Wi-Fi credentials
+
+1. Open the folder `firmware/esp32_mqtt_aerofresh`.
+2. Make a copy of `secrets.h.example` named `secrets.h` in the same folder.
+3. Replace `YOUR_WIFI_NAME` and `YOUR_WIFI_PASSWORD` with your Wi-Fi name and password.
+4. Save `secrets.h`. It is excluded from Git by `.gitignore`; never upload it to GitHub or share it in chat.
+
+Use a 2.4 GHz Wi-Fi network; classic ESP32 boards generally do not support 5 GHz Wi-Fi.
+
+## 3. Check wiring before powering
 
 | Signal | ESP32 pin | Notes |
 |---|---:|---|
-| DHT22 DATA | GPIO 4 | DHT22 module; confirm module supply and pinout |
-| MQ-135 AO | GPIO 34 | Analog input only; output must be divided/conditioned to max 3.3 V |
-| LDR divider midpoint | GPIO 35 | Use LDR + fixed resistor as a divider between 3.3 V and GND |
-| Grounds | GND | All sensor and ESP32 grounds common |
+| DHT22 DATA | GPIO 4 | Confirm module pinout and supply |
+| MQ-135 AO | GPIO 34 | Use a divider/conditioning circuit; ADC input must stay at or below 3.3 V |
+| LDR divider midpoint | GPIO 35 | LDR + fixed resistor divider between 3.3 V and GND |
+| Grounds | GND | All grounds common |
 
-Change the constants in the sketch if your physical wiring uses different GPIOs. Do not connect the MQ-135 module's 5 V analog output directly to an ESP32 pin. Check the module output range with a multimeter and use a suitable resistor divider/conditioning circuit. Never power the ESP32 ADC pin above 3.3 V.
+**Never connect MQ-135 AO directly if it can exceed 3.3 V.** Many MQ-135 modules run at 5 V and their analog output can exceed the ESP32 ADC limit. Check with a multimeter and add suitable voltage division/conditioning.
 
-## Broker settings
+## 4. Upload firmware
 
-Create a managed broker/cluster and a unique username/password with publish permission only to `aerofresh/telemetry` for the ESP32. Create a second dashboard credential with subscribe/read permission only to that topic if the provider supports topic ACLs.
+1. Open `esp32_mqtt_aerofresh.ino` in Arduino IDE.
+2. Select the correct board and COM/USB port.
+3. Click Upload.
+4. Open Serial Monitor at **115200 baud**.
+5. Look for Wi-Fi connected, MQTT connected, and periodic `Published:` JSON messages.
 
-For HiveMQ Cloud:
-- ESP32 host: the cluster hostname (e.g. `xxxx.s1.eu.hivemq.cloud`), port **8883**, TLS.
-- Dashboard WSS URL: `wss://xxxx.s1.eu.hivemq.cloud:8884/mqtt`.
-- Topic: `aerofresh/telemetry`.
-- Device ID: `aerofresh-esp32-01`.
-- The host and credentials are shown in your cluster's connection details. The cluster's WSS client / Troubleshooting tab is useful to verify a subscription before connecting the ESP32.
+The sketch publishes every 15 seconds. It sends `device_id`, UTC `timestamp`, `temperature`, `humidity`, `gas_adc`, and `ldr_adc`.
 
-Do not paste a normal `mqtts://...` address or port 8883 into the browser form. The browser requires the broker's WSS listener URL. ESP32 firmware uses the TCP/TLS host + port instead.
+## 5. Connect the AeroFresh website
 
-## Dashboard connection
+1. Open the deployed AeroFresh website over HTTPS.
+2. Go to **System Information → MQTT integration configuration**.
+3. The form defaults should already show the FreeMQTT WSS URL, topic and device ID:
+   - WSS URL: `wss://broker.freemqtt.com:8084/mqtt`
+   - Topic: `aerofresh/himani-ai/device01/telemetry`
+   - Device ID: `aerofresh-esp32-01`
+   - Username: `freemqtt`
+   - Password: `public`
+4. Click **Connect live MQTT**.
+5. Wait for the first valid ESP32 payload. The dashboard remains in demo mode until real telemetry arrives.
 
-1. Deploy/open the AeroFresh site over HTTPS (GitHub Pages is fine).
-2. Open **System → MQTT integration configuration**.
-3. Enter the WSS URL, topic and device ID; enter the dashboard's read-only username/password.
-4. Press **Connect live MQTT**. It should show broker connected; the display switches to LIVE only after the first valid ESP32 payload.
-5. Upload/run the ESP32 sketch. Serial Monitor should print each published JSON message and the dashboard should update.
-6. Leave **Remember settings** unchecked on shared/public computers. Only non-secret broker URL/topic/device ID/username are stored locally; password is never saved. The browser session must enter the password again after reload.
+## 6. Test without hardware (optional)
 
-## Payload contract
-
-Required fields: `device_id`, `timestamp` (UTC ISO-8601 ending in Z), `temperature` (°C), `humidity` (%RH), `gas_adc` (0–4095), `ldr_adc` (0–4095). Optional: `dust_raw`, `aqi`, `tvoc`, `eco2`. Missing optional sensors remain unavailable.
-
-Example:
-```json
-{"device_id":"aerofresh-esp32-01","timestamp":"2026-11-11T08:30:00Z","temperature":28.4,"humidity":61.2,"gas_adc":1240,"ldr_adc":2100}
-```
+Use any MQTT client that supports WebSockets to publish a test JSON message to the exact topic above. Set the same username/password. The website should switch to LIVE only after receiving a payload whose `device_id` matches and whose fields validate. A test message is not a physical sensor reading.
 
 ## Troubleshooting
 
-- Browser says MQTT.js unavailable: check internet access and the mqtt.js CDN request in DevTools.
-- WebSocket fails but ESP32 connects: WSS port/path is wrong or blocked. Verify the provider's WSS endpoint (HiveMQ Cloud Starter: 8884 and /mqtt) and test from the provider's WebSocket client.
-- MQTT auth failure: regenerate credentials and ensure browser user has subscribe ACL and ESP32 user has publish ACL.
-- ESP32 TLS fails: ensure system time synchronized and CA PEM matches the broker's current certificate chain; do not switch to `setInsecure()` as a permanent fix.
-- ESP32 publishes but dashboard ignores data: topic and device_id must match exactly; JSON keys and ranges must follow the contract.
-- MQ-135 reading stuck or saturated: check warm-up, AO voltage divider, ADC pin and grounding. ADC counts are raw response, not ppm.
+- **WebSocket fails:** confirm exact WSS URL including port `8084` and path `/mqtt`; try again later because this is a public best-effort broker.
+- **ESP32 Wi-Fi fails:** confirm 2.4 GHz Wi-Fi and credentials in local `secrets.h`.
+- **MQTT connection fails:** check host `broker.freemqtt.com`, TCP port `1883`, username/password, and Serial Monitor error state.
+- **Dashboard connects but no live data:** verify exact topic and device ID; the ESP32 and website must use the same topic.
+- **DHT22 read fails:** check VCC, GND, DATA wiring and module pinout.
+- **MQ-135 ADC is saturated:** check warm-up, AO voltage divider, ADC pin and common ground. ADC counts are raw response, not ppm.
