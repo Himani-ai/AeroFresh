@@ -10,11 +10,11 @@
     refreshIntervalMs: 12000,
     mqtt: {
       enabled: false,
-      brokerUrl: "",
-      topic: "aerofresh/telemetry",
-      deviceId: "",
-      username: "",
-      password: "",
+      brokerUrl: "wss://broker.freemqtt.com:8084/mqtt",
+      topic: "aerofresh/himani-ai/device01/telemetry",
+      deviceId: "aerofresh-esp32-01",
+      username: "freemqtt",
+      password: "public",
       reconnectPeriodMs: 3000,
       staleTimeoutMs: 90000
     },
