@@ -471,7 +471,7 @@
     }
     disconnectMqtt(false);
     state.mqttConfig = { ...config, enabled: true };
-    if ($("#mqttRemember")?.checked) { const safeConfig = { brokerUrl: config.brokerUrl, topic: config.topic, deviceId: config.deviceId, username: config.username || "" }; localStorage.setItem("aerofresh-mqtt-config", JSON.stringify(safeConfig)); } else { localStorage.removeItem("aerofresh-mqtt-config"); }
+    if ($("#mqttRemember")?.checked) { const safeConfig = { brokerUrl: config.brokerUrl, topic: config.topic, deviceId: config.deviceId }; localStorage.setItem("aerofresh-mqtt-config", JSON.stringify(safeConfig)); } else { localStorage.removeItem("aerofresh-mqtt-config"); }
     if ($("#mqttBrokerSummary")) $("#mqttBrokerSummary").textContent = config.brokerUrl;
     if ($("#mqttTopicSummary")) $("#mqttTopicSummary").textContent = config.topic;
     state.lastLiveUpdate = null;
