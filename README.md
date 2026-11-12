@@ -142,3 +142,18 @@ A lightweight two-track workflow is documented in [tinyml/README.md](tinyml/READ
 The ESP32 publisher sketch, installation list, broker setup, wiring defaults and payload contract are in [firmware/esp32_mqtt_aerofresh/README.md](firmware/esp32_mqtt_aerofresh/README.md). The current prototype configuration uses plain MQTT/TCP on port 1883 from the ESP32 to the documented shared public broker, then MQTT over secure WebSockets (WSS) from the browser. This is a learning/demo setup only: the device-to-broker hop is not encrypted, and the shared broker does not provide the per-device access restrictions expected for deployment. Do not send private data or credentials through it. For a secure deployment, move both clients to a private broker with authenticated TLS and separate publish-only / subscribe-only credentials. Install Arduino IDE 2.x, Espressif ESP32 board package, PubSubClient, Adafruit DHT sensor library and Adafruit Unified Sensor. WiFi is included in the ESP32 core.
 
 **Hardware safety:** MQ-135 modules are commonly powered at 5 V. Never connect an analog output that can exceed 3.3 V directly to an ESP32 ADC pin; use a suitable voltage divider/conditioning circuit. The sketch defaults are GPIO4 (DHT22), GPIO34 (MQ-135 AO) and GPIO35 (LDR divider midpoint); change them to match the actual wiring. Do not commit `secrets.h` or broker credentials.
+
+
+## Sensor data and monitoring flow
+
+AeroFresh uses three sensor inputs to build a view of the storage environment:
+
+| Sensor | Measurement | Data representation |
+|---|---|---|
+| DHT22 | Temperature and relative humidity | Temperature in °C and humidity in % |
+| MQ-135 | Broad gas response | Raw ADC count from 0 to 4095 |
+| LDR | Light level near the storage lid | Raw ADC count from 0 to 4095 |
+
+The ESP32 samples the sensors and packages the readings with a device identifier and UTC timestamp. The telemetry topic is used by the dashboard to receive updates. The browser validates the device identifier, timestamp and sensor ranges before accepting a reading.
+
+The MQ-135 and LDR values are sensor responses rather than calibrated physical units. They should be interpreted alongside the sampling conditions and sensor calibration notes. A change in the light reading can help identify a lid-open event, while temperature and humidity provide context about the storage environment.
