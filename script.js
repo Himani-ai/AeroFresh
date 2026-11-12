@@ -248,7 +248,7 @@
   }
   function renderAnomalySummary() {
     const counts = ["high", "medium", "low"].map(s => state.alerts.filter(a => a.severity === s).length);
-    $("#anomalySummary").innerHTML = `<div class="anomaly-stat"><span>High severity</span><strong style="color:var(--red)">${counts[0]}</strong><small>Rule-based alerts</small></div><div class="anomaly-stat"><span>Medium severity</span><strong style="color:var(--amber)">${counts[1]}</strong><small>Illustrative alerts</small></div><div class="anomaly-stat"><span>Low severity</span><strong style="color:var(--cyan)">${counts[2]}</strong><small>System events</small></div>`;
+    $("#anomalySummary").innerHTML = `<div class="anomaly-stat"><span>High severity</span><strong style="color:var(--red)">${counts[0]}</strong><small>Rule-based alerts</small></div><div class="anomaly-stat"><span>Medium severity</span><strong style="color:var(--amber)">${counts[1]}</strong><small>Rule-based alerts</small></div><div class="anomaly-stat"><span>Low severity</span><strong style="color:var(--cyan)">${counts[2]}</strong><small>System events</small></div>`;
   }
   function renderAllAlerts() {
     const filter = $("#alertFilter")?.value || "all";
