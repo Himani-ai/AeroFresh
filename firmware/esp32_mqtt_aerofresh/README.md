@@ -78,3 +78,19 @@ Use any MQTT client that supports WebSockets to publish a test JSON message to t
 - **Dashboard connects but no live data:** verify exact topic and device ID; the ESP32 and website must use the same topic.
 - **DHT22 read fails:** check VCC, GND, DATA wiring and module pinout.
 - **MQ-135 ADC is saturated:** check warm-up, AO voltage divider, ADC pin and common ground. ADC counts are raw response, not ppm.
+
+
+## Telemetry field reference
+
+| Field | Type | Description |
+|---|---|---|
+| `device_id` | String | Identifies the ESP32 device |
+| `timestamp` | UTC ISO 8601 string | Time at which the sample was recorded |
+| `temperature` | Number | DHT22 temperature in degrees Celsius |
+| `humidity` | Number | DHT22 relative humidity percentage |
+| `gas_adc` | Integer | Raw MQ-135 ADC reading |
+| `ldr_adc` | Integer | Raw LDR ADC reading |
+
+The current publisher sends one JSON telemetry message every 15 seconds when Wi-Fi and MQTT are connected and both DHT22 values are valid. If the DHT22 read fails or the UTC clock is not synchronized, that sample is skipped. The analog readings are retained as ADC counts and are not converted to gas concentration or illuminance.
+
+Keep the topic and device identifier consistent between the firmware and the dashboard configuration. When troubleshooting, check the serial output first, then confirm that the broker and browser subscription use the same topic.
