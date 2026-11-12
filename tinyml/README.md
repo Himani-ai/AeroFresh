@@ -20,3 +20,8 @@ Required inputs: MQ-135 raw ADC, DHT22 temperature, DHT22 humidity, LDR raw ADC.
 Firmware call after training: `aerofresh_predict_stage(mq135Raw, temperatureC, humidityPct, ldrRaw)`.
 
 This is a small decision tree, not TensorFlow Lite Micro. No hardware model is included yet: actual labelled ESP32 readings are still required. MQ-135 ADC is not ppm and requires warm-up, stable analog design and calibration. A ripeness estimate is not a food-safety test.
+
+
+## Relationship to the live sensor stream
+
+The hardware-specific workflow is separate from the external VOC research baseline. Hardware training should use labelled readings collected from the AeroFresh ESP32, with the sensor fields recorded consistently across samples. Keep the original readings and labels together so that preprocessing, train/test splitting and model evaluation can be reproduced. Do not treat external VOC features as interchangeable with the project's MQ-135 ADC response.
