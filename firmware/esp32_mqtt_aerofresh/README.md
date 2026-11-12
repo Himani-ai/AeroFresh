@@ -8,9 +8,9 @@
 - Device ID: `aerofresh-esp32-01`.
 - Public broker credentials: username `freemqtt`, password `public`.
 
-These are the public connection details currently published by [FreeMQTT](https://www.freemqtt.com/). The broker is shared and intended only for learning, testing and prototyping. Assume messages/topics are visible to other users; do not publish personal data, Wi-Fi credentials or private information. Its service has no uptime guarantee and may restart.
+These are the public connection details currently published by [FreeMQTT](https://www.freemqtt.com/). The broker is shared and intended only for learning, testing and prototyping. Assume messages/topics are visible to other users; do not publish personal data, Wi-Fi credentials or private information. Its service has no uptime guarantee and may restart. The shared public username is not a dedicated per-device account and does not demonstrate the issue's required publish-only ESP32 and subscribe-only dashboard permissions. Treat it strictly as a temporary integration test endpoint.
 
-**Transport note:** this prototype uses unencrypted MQTT/TCP on port 1883 from the ESP32 to avoid hardcoding an unverified CA certificate. The browser uses WSS. This is acceptable only for non-sensitive prototype telemetry on a public broker. For production, move to a private broker with TLS and device-specific credentials.
+**Transport note:** this prototype uses unencrypted MQTT/TCP on port 1883 from the ESP32 to avoid hardcoding an unverified CA certificate. The browser uses WSS. Browser-to-broker traffic is encrypted, but the ESP32-to-broker hop is not. This does not satisfy an end-to-end secure transport requirement. Use a private broker with TLS on the device connection, verified CA trust, and separate least-privilege credentials before treating broker security as complete.
 
 ## 1. Install software
 
