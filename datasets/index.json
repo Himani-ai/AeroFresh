@@ -1,1 +1,7 @@
-[]
+[
+  {
+    "name": "Milk run 1",
+    "file": "datasets/milk_run_1.csv",
+    "rows": 3384
+  }
+]
