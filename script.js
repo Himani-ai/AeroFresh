@@ -74,6 +74,7 @@
     initDoorControl();
     setInterval(tickLid, 1000);
     loadBananaDataset();
+    initDatasetAnalysis();
     updateClock();
     setInterval(updateClock, 1000);
     setInterval(checkLiveStaleness, 5000);
@@ -659,6 +660,217 @@
     if (door === "open" && state.lid?.status !== "open") add("lid-open", "low", "Lid opened", `The lid was opened (open count ${payload.lid_open_count ?? "?"}).`);
     if (door === "open" && openFor >= 30) add("lid-long", "medium", "Lid left open", `The lid has been open for ${openFor} s.`);
   }
+
+  // ---------- Dataset analysis: pick a recorded run (CSV), press Analyze ----------
+  const DS_COLS = {
+    time: ["device_timestamp", "timestamp", "received_at_utc", "time", "datetime", "date"],
+    temp: ["temperature", "temp", "temperature_c", "temp_c"],
+    hum: ["humidity", "humidity_pct", "humidity_percent", "rh"],
+    gas: ["gas_adc", "mq135", "mq135_raw", "mq135_adc", "gas"],
+    ldr: ["ldr_adc", "ldr", "ldr_raw", "light_adc", "light"],
+    door: ["door_state", "lid", "lid_state", "door"],
+    lidCount: ["lid_open_count", "lid_count"],
+    lidDur: ["lid_duration_seconds", "lid_seconds"],
+    label: ["label", "run", "run_label", "session"]
+  };
+  function parseCsv(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const rows = []; let row = [], cell = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+      else if (c === '"') q = true;
+      else if (c === ",") { row.push(cell); cell = ""; }
+      else if (c === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; }
+      else if (c !== "\r") cell += c;
+    }
+    if (cell.length || row.length) { row.push(cell); rows.push(row); }
+    return rows.filter(r => r.some(x => x.trim() !== ""));
+  }
+  function dsToRecords(text) {
+    const table = parseCsv(text);
+    if (table.length < 2) throw new Error("The file has no data rows.");
+    const head = table[0].map(h => h.trim().toLowerCase());
+    const idx = {};
+    for (const [key, names] of Object.entries(DS_COLS)) idx[key] = names.map(n => head.indexOf(n)).filter(i => i >= 0);
+    if (!idx.time.length) throw new Error("No time column found (expected device_timestamp or received_at_utc).");
+    if (!idx.gas.length && !idx.temp.length && !idx.hum.length) throw new Error("No sensor columns found (expected temperature, humidity, gas_adc).");
+    const numAt = (r, list) => { for (const i of list) { const v = (r[i] ?? "").trim(); if (v !== "" && !/^(null|nan|none)$/i.test(v)) { const n = Number(v); if (Number.isFinite(n)) return n; } } return NaN; };
+    const strAt = (r, list) => { for (const i of list) { const v = (r[i] ?? "").trim(); if (v) return v; } return ""; };
+    const out = [];
+    for (let k = 1; k < table.length; k++) {
+      const r = table[k]; let t = NaN;
+      for (const i of idx.time) { const ms = Date.parse((r[i] ?? "").trim()); if (Number.isFinite(ms) && new Date(ms).getUTCFullYear() >= 2020) { t = ms; break; } }
+      if (!Number.isFinite(t)) continue;
+      out.push({ t, temp: numAt(r, idx.temp), hum: numAt(r, idx.hum), gas: numAt(r, idx.gas), ldr: numAt(r, idx.ldr),
+        door: strAt(r, idx.door).toLowerCase(), lidCount: numAt(r, idx.lidCount), lidDur: numAt(r, idx.lidDur), label: strAt(r, idx.label) });
+    }
+    if (!out.length) throw new Error("No rows with a valid time were found.");
+    return out.sort((a, b) => a.t - b.t);
+  }
+  const dsMedian = a => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const dsMean = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : NaN;
+  function dsPearson(x, y) {
+    const n = x.length; if (n < 8) return NaN;
+    const mx = dsMean(x), my = dsMean(y); let sxy = 0, sxx = 0, syy = 0;
+    for (let i = 0; i < n; i++) { const dx = x[i] - mx, dy = y[i] - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
+    return sxx && syy ? sxy / Math.sqrt(sxx * syy) : NaN;
+  }
+  function dsPairs(rows, a, b) { const x = [], y = []; rows.forEach(r => { if (Number.isFinite(r[a]) && Number.isFinite(r[b])) { x.push(r[a]); y.push(r[b]); } }); return dsPearson(x, y); }
+  function dsStat(rows, key) {
+    const v = rows.map(r => r[key]).filter(Number.isFinite);
+    if (!v.length) return null;
+    return { n: v.length, missing: rows.length - v.length, min: Math.min(...v), max: Math.max(...v), mean: dsMean(v), first: v[0], last: v[v.length - 1] };
+  }
+  function analyzeRows(rows) {
+    const n = rows.length, span = rows[n - 1].t - rows[0].t;
+    const dts = []; for (let i = 1; i < n; i++) dts.push(rows[i].t - rows[i - 1].t);
+    const medDt = dsMedian(dts), gapLimit = Math.max(5 * medDt, 60e3);
+    const gaps = dts.filter(d => d > gapLimit);
+    const res = { n, start: rows[0].t, end: rows[n - 1].t, span, medDt, gapCount: gaps.length, longestGap: gaps.length ? Math.max(...gaps) : 0,
+      stats: { temp: dsStat(rows, "temp"), hum: dsStat(rows, "hum"), gas: dsStat(rows, "gas"), ldr: dsStat(rows, "ldr") } };
+    const g = rows.filter(r => Number.isFinite(r.gas));
+    if (g.length >= 10) {
+      const w = Math.min(60, Math.max(5, Math.round(g.length * 0.1)));
+      const base = dsMedian(g.slice(0, w).map(r => r.gas)), fin = dsMedian(g.slice(-w).map(r => r.gas));
+      const roll = g.map((_, i) => dsMedian(g.slice(Math.max(0, i - 4), i + 1).map(r => r.gas)));
+      const onset = factor => { for (let i = 0; i < roll.length; i++) { const run = roll.slice(i, i + 10); if (run.every(v => v >= base * factor)) return g[i].t; } return null; };
+      let peak = g[0]; g.forEach(r => { if (r.gas > peak.gas) peak = r; });
+      const t0 = g[0].t, xs = g.map(r => (r.t - t0) / 3600e3), ys = g.map(r => r.gas), mx = dsMean(xs), my = dsMean(ys);
+      let sxy = 0, sxx = 0; xs.forEach((x, i) => { sxy += (x - mx) * (ys[i] - my); sxx += (x - mx) ** 2; });
+      res.gas = { base, fin, rise: base ? (fin - base) / base * 100 : NaN, peak: peak.gas, peakAt: peak.t, onset10: onset(1.10), onset25: onset(1.25), slope: sxx ? sxy / sxx : NaN };
+    }
+    res.corr = { gasTemp: dsPairs(rows, "gas", "temp"), gasHum: dsPairs(rows, "gas", "hum"), tempHum: dsPairs(rows, "temp", "hum") };
+    let isOpen = false, openedAt = 0, events = 0, total = 0, longest = 0, seen = false, maxCount = NaN;
+    rows.forEach(r => {
+      if (Number.isFinite(r.lidCount)) maxCount = Number.isFinite(maxCount) ? Math.max(maxCount, r.lidCount) : r.lidCount;
+      if (r.door !== "open" && r.door !== "closed") return;
+      seen = true;
+      if (r.door === "open" && !isOpen) { isOpen = true; openedAt = r.t; events++; }
+      else if (r.door === "closed" && isOpen) { isOpen = false; const d = r.t - openedAt; total += d; longest = Math.max(longest, d); }
+    });
+    if (isOpen) { const d = rows[n - 1].t - openedAt; total += d; longest = Math.max(longest, d); }
+    res.lid = { seen, events: Number.isFinite(maxCount) && maxCount > events ? maxCount : events, total, longest };
+    return res;
+  }
+  const dsFmt = (v, d = 0) => Number.isFinite(v) ? v.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }) : "—";
+  const dsPct = v => Number.isFinite(v) ? `${v > 0 ? "+" : ""}${v.toFixed(1)} %` : "—";
+  const dsWhen = t => new Date(t).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  function dsSpan(ms) {
+    const s = Math.round(ms / 1000);
+    if (s >= 86400) return `${Math.floor(s / 86400)} d ${Math.floor(s % 86400 / 3600)} h`;
+    if (s >= 3600) return `${Math.floor(s / 3600)} h ${Math.floor(s % 3600 / 60)} min`;
+    return fmtDur(s);
+  }
+  function dsStrength(rise) {
+    if (!Number.isFinite(rise)) return ["No gas data", ""];
+    const a = Math.abs(rise);
+    if (a < 5) return ["No meaningful change", "The gas reading stayed within 5 % of where it started."];
+    if (a < 15) return ["Slight change", "The gas reading moved 5–15 % from its starting level."];
+    if (a < 30) return ["Moderate change", "The gas reading moved 15–30 % from its starting level."];
+    return ["Strong change", "The gas reading moved more than 30 % from its starting level."];
+  }
+  function dsCorrWords(r) {
+    if (!Number.isFinite(r)) return "not enough data";
+    const a = Math.abs(r), dir = r > 0 ? "rise together" : "move in opposite directions";
+    return a < 0.3 ? `no clear link (r = ${r.toFixed(2)})` : `${a < 0.6 ? "weakly" : "strongly"} ${dir} (r = ${r.toFixed(2)})`;
+  }
+  function renderDatasetAnalysis(rows, name) {
+    const a = analyzeRows(rows), s = a.stats, [verdict, verdictNote] = dsStrength(a.gas?.rise);
+    $("#dsCards").innerHTML = [
+      ["Readings", dsFmt(a.n), `${dsFmt(s.gas?.n ?? 0)} with a gas value`],
+      ["Duration", dsSpan(a.span), `${dsWhen(a.start)} → ${dsWhen(a.end)}`],
+      ["Reading every", dsSpan(a.medDt), a.gapCount ? `${a.gapCount} gap${a.gapCount > 1 ? "s" : ""} in the data` : "no gaps"],
+      ["Gas change", a.gas ? dsPct(a.gas.rise) : "—", verdict]
+    ].map(([l, v, sub]) => `<div class="anomaly-stat"><span>${esc(l)}</span><strong>${esc(v)}</strong><small>${esc(sub)}</small></div>`).join("");
+    const f = [];
+    if (a.gas) {
+      f.push(`<strong>${esc(verdict)}.</strong> ${esc(verdictNote)} It started near ${dsFmt(a.gas.base)} ADC and ended near ${dsFmt(a.gas.fin)} ADC (${dsPct(a.gas.rise)}). The highest reading was ${dsFmt(a.gas.peak)} ADC at ${esc(dsWhen(a.gas.peakAt))}.`);
+      f.push(a.gas.onset10 ? `The gas reading first stayed at least 10 % above its starting level from <strong>${esc(dsWhen(a.gas.onset10))}</strong>, ${esc(dsSpan(a.gas.onset10 - a.start))} into the run.${a.gas.onset25 ? ` It stayed 25 % above from ${esc(dsWhen(a.gas.onset25))}.` : ""}` : "The gas reading never stayed 10 % above its starting level.");
+      f.push(`Overall drift: ${a.gas.slope >= 0 ? "+" : ""}${dsFmt(a.gas.slope, 1)} ADC per hour.`);
+    } else f.push("There are too few gas readings to measure a change (at least 10 are needed).");
+    if (s.temp) f.push(`Temperature stayed between ${dsFmt(s.temp.min, 1)} and ${dsFmt(s.temp.max, 1)} °C (average ${dsFmt(s.temp.mean, 1)} °C).`);
+    if (s.hum) f.push(`Humidity stayed between ${dsFmt(s.hum.min, 1)} and ${dsFmt(s.hum.max, 1)} % (average ${dsFmt(s.hum.mean, 1)} %).`);
+    if (a.gas) {
+      f.push(`Gas and temperature ${esc(dsCorrWords(a.corr.gasTemp))}. Gas and humidity ${esc(dsCorrWords(a.corr.gasHum))}.${Math.abs(a.corr.gasTemp) >= 0.6 ? " Because gas follows temperature closely, part of the change may come from the warmth and not only from the food." : ""}`);
+    }
+    if (a.lid.seen) f.push(`The lid was opened <strong>${dsFmt(a.lid.events)}</strong> time${a.lid.events === 1 ? "" : "s"}, open for ${esc(dsSpan(a.lid.total))} in total (longest ${esc(dsSpan(a.lid.longest))}).`);
+    if (a.gapCount) f.push(`${a.gapCount} gap${a.gapCount > 1 ? "s" : ""} in the recording (the longest lasted ${esc(dsSpan(a.longestGap))}), probably from Wi-Fi drops or the logger being paused.`);
+    $("#dsFindings").innerHTML = f.map(x => `<li>${x}</li>`).join("");
+    const row = (label, st, unit, d) => st ? `<tr><td>${label}</td><td>${dsFmt(st.n)}</td><td>${dsFmt(st.min, d)}</td><td>${dsFmt(st.max, d)}</td><td>${dsFmt(st.mean, d)}</td><td>${dsFmt(st.first, d)}</td><td>${dsFmt(st.last, d)}</td><td>${unit}</td></tr>` : "";
+    $("#dsTable").innerHTML = `<table class="ds-table"><thead><tr><th>Sensor</th><th>Readings</th><th>Min</th><th>Max</th><th>Average</th><th>Start</th><th>End</th><th>Unit</th></tr></thead><tbody>${row("Temperature (DHT22)", s.temp, "°C", 1)}${row("Humidity (DHT22)", s.hum, "%", 1)}${row("Gas response (MQ-135)", s.gas, "ADC", 0)}${row("Light level (LDR)", s.ldr, "ADC", 0)}</tbody></table>`;
+    if (!window.Chart) return;
+    const pts = decimate(rows), spanLong = a.span > 36 * 3600e3;
+    const labels = pts.map(r => new Date(r.t).toLocaleString([], spanLong ? { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" } : { hour: "2-digit", minute: "2-digit" }));
+    const series = key => pts.map(r => Number.isFinite(r[key]) ? r[key] : null);
+    const draw = (id, title, key, color, unit, extra = [], stepped = false) => {
+      const canvas = document.getElementById(id); if (!canvas) return;
+      const ctx = canvas.getContext("2d"), ds = makeDataset(title, series(key), color, ctx, stepped ? 0 : .3);
+      ds.spanGaps = true; if (stepped) ds.stepped = true;
+      chartFor(id, { type: "line", data: { labels, datasets: [ds, ...extra] }, options: chartBaseOptions(unit) });
+    };
+    const flat = (label, v, color) => ({ label, data: pts.map(() => v), borderColor: color, borderDash: [6, 4], borderWidth: 1.4, pointRadius: 0, fill: false });
+    draw("dsGasChart", "Gas response", "gas", "#a995ed", "ADC", a.gas ? [flat("Starting level", a.gas.base, "#8fa6b6"), flat("+10 %", a.gas.base * 1.1, "#f4bd69")] : []);
+    draw("dsTempChart", "Temperature", "temp", "#53d5bd", "°C");
+    draw("dsHumChart", "Humidity", "hum", "#50c8e8", "%");
+    draw("dsLdrChart", "Light level", "ldr", "#f4bd69", "ADC", [], true);
+  }
+  const dsState = { all: [], name: "" };
+  function dsStatus(msg, bad) { const el = $("#dsStatus"); el.textContent = msg; el.style.color = bad ? "var(--amber)" : ""; }
+  function dsRun() {
+    const wrap = $("#dsRunWrap"), runSel = $("#dsRun");
+    const rows = runSel.value ? dsState.all.filter(r => r.label === runSel.value) : dsState.all;
+    if (!rows.length) { $("#dsResult").hidden = true; dsStatus("That run has no readings.", true); return; }
+    $("#dsResult").hidden = false;
+    dsStatus(`Showing ${rows.length.toLocaleString()} readings from ${dsState.name}${runSel.value ? ` · run “${runSel.value}”` : ""}.`);
+    renderDatasetAnalysis(rows, dsState.name);
+    if (window.lucide) lucide.createIcons();
+  }
+  function dsLoadText(text, name) {
+    try { dsState.all = dsToRecords(text); dsState.name = name; }
+    catch (e) { $("#dsResult").hidden = true; dsStatus(e.message, true); return; }
+    const labels = [...new Set(dsState.all.map(r => r.label).filter(Boolean))];
+    const runSel = $("#dsRun");
+    runSel.innerHTML = `<option value="">All runs together</option>` + labels.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join("");
+    $("#dsRunWrap").hidden = labels.length < 2;
+    dsRun();
+  }
+  async function dsAnalyzeSelected() {
+    const sel = $("#dsSelect"), item = dsState.manifest?.[Number(sel.value)];
+    if (!item) { dsStatus("Choose a dataset first, or upload a CSV file.", true); return; }
+    dsStatus(`Loading ${item.name} ...`);
+    try {
+      const r = await fetch(item.file, { cache: "no-store" });
+      if (!r.ok) throw new Error(`Could not load ${item.file} (HTTP ${r.status}).`);
+      dsLoadText(await r.text(), item.name);
+    } catch (e) { $("#dsResult").hidden = true; dsStatus(e.message, true); }
+  }
+  async function initDatasetAnalysis() {
+    const sel = $("#dsSelect"); if (!sel) return;
+    $("#dsAnalyze").addEventListener("click", dsAnalyzeSelected);
+    sel.addEventListener("change", dsAnalyzeSelected);
+    $("#dsRun").addEventListener("change", dsRun);
+    $("#dsFile").addEventListener("change", e => {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => dsLoadText(String(reader.result), file.name);
+      reader.onerror = () => dsStatus("Could not read that file.", true);
+      reader.readAsText(file); e.target.value = "";
+    });
+    try {
+      const r = await fetch("datasets/index.json", { cache: "no-store" });
+      dsState.manifest = r.ok ? await r.json() : [];
+    } catch { dsState.manifest = []; }
+    if (!Array.isArray(dsState.manifest)) dsState.manifest = [];
+    if (dsState.manifest.length) {
+      sel.innerHTML = dsState.manifest.map((d, i) => `<option value="${i}">${esc(d.name || d.file)}</option>`).join("");
+      dsStatus("Choose a dataset and press Analyze, or upload a CSV file.");
+    } else {
+      sel.innerHTML = `<option value="">No saved datasets yet</option>`;
+      dsStatus("No saved datasets yet. Upload a CSV file recorded by the logger to analyze it now.");
+    }
+  }
+  window.AeroAnalysis = { parseCsv, toRecords: dsToRecords, analyze: analyzeRows };
 
   // Banana-ripeness research dataset (University of Bath, CC BY 4.0): summary from the repository's report files.
   const STAGE_INFO = [

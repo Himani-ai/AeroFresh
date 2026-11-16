@@ -28,6 +28,7 @@
         <a class="nav-link" href="#analytics" data-section="analytics"><i data-lucide="chart-no-axes-combined"></i><span>Historical Analytics</span></a>
         <a class="nav-link" href="#anomalies" data-section="anomalies"><i data-lucide="scan-search"></i><span>Anomaly Detection</span></a>
         <a class="nav-link" href="#risk" data-section="risk"><i data-lucide="shield-alert"></i><span>Risk Analysis</span></a>
+        <a class="nav-link" href="#analysis" data-section="analysis"><i data-lucide="flask-conical"></i><span>Dataset Analysis</span></a>
         <a class="nav-link" href="#banana" data-section="banana"><i data-lucide="database"></i><span>Banana Ripeness</span></a>
         <a class="nav-link" href="#assistant" data-section="assistant"><i data-lucide="messages-square"></i><span>Ask AeroFresh</span></a>
         <a class="nav-link" href="#system" data-section="system"><i data-lucide="cpu"></i><span>System Information</span></a>
@@ -125,6 +126,28 @@
             <article class="panel factor-panel"><div class="panel-header"><div><h3>Contributing signals</h3><p>Component weights</p></div></div><div id="riskFactors"></div></article>
           </div>
           <article class="panel methodology-panel"><div class="panel-header"><div><h3>How the risk score works</h3><span class="tiny-badge">TRANSPARENT LOGIC</span></div></div><div class="method-grid"><div><span class="method-number">01</span><strong>Temperature deviation</strong><p>Compares the current reading against an illustrative reference band.</p></div><div><span class="method-number">02</span><strong>Humidity deviation</strong><p>Represents sustained moisture conditions using a simple threshold component.</p></div><div><span class="method-number">03</span><strong>Gas-response change</strong><p>Uses relative variation from a rolling baseline, not a gas concentration.</p></div><div><span class="method-number">04</span><strong>Persistence</strong><p>Adds a small contribution when recent conditions remain outside the reference bands.</p></div></div><p class="disclaimer"><i data-lucide="alert-circle"></i> The weights and thresholds are illustrative engineering placeholders. Calibrate with real sensor data and validated food-storage studies before drawing operational or food-safety conclusions.</p></article>
+        </section>
+
+        <section class="page-section" id="analysis">
+          <div class="page-heading compact-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> RECORDED DATA</div><h1>Dataset <span class="gradient-text">analysis</span></h1><p class="subheading">Pick a recorded run, press Analyze, and see how the readings changed over time.</p></div></div>
+          <div class="analytics-toolbar ds-toolbar">
+            <div class="ds-pick"><label for="dsSelect">Dataset</label><select id="dsSelect"><option value="">Loading ...</option></select></div>
+            <div class="ds-pick" id="dsRunWrap" hidden><label for="dsRun">Run</label><select id="dsRun"></select></div>
+            <div class="ds-actions"><button class="ds-btn primary" id="dsAnalyze" type="button"><i data-lucide="play"></i> Analyze</button><label class="ds-btn" for="dsFile"><i data-lucide="upload"></i> Upload CSV</label><input id="dsFile" type="file" accept=".csv,text/csv" hidden></div>
+          </div>
+          <p class="fine-print" id="dsStatus">Loading datasets ...</p>
+          <div id="dsResult" hidden>
+            <div class="anomaly-summary ds-cards" id="dsCards"></div>
+            <article class="panel ds-findings-panel"><div class="panel-header"><div><h3>What the data shows</h3><p>Worked out from the readings in this run</p></div><span class="tiny-badge">AUTOMATIC</span></div><ul class="ds-findings" id="dsFindings"></ul></article>
+            <div class="analytics-grid ds-charts">
+              <article class="panel analytics-chart ds-wide"><div class="panel-header"><div><h3>Gas response over time</h3><p>MQ-135 raw readings, with the starting level and a +10 % line</p></div><span class="unit-chip">ADC</span></div><div class="chart-wrap large-chart"><canvas id="dsGasChart"></canvas></div></article>
+              <article class="panel analytics-chart"><div class="panel-header"><div><h3>Temperature</h3><p>DHT22</p></div><span class="unit-chip">°C</span></div><div class="chart-wrap"><canvas id="dsTempChart"></canvas></div></article>
+              <article class="panel analytics-chart"><div class="panel-header"><div><h3>Humidity</h3><p>DHT22</p></div><span class="unit-chip">%</span></div><div class="chart-wrap"><canvas id="dsHumChart"></canvas></div></article>
+              <article class="panel analytics-chart ds-wide"><div class="panel-header"><div><h3>Light level</h3><p>LDR raw readings. Low values mean light, so the lid was open</p></div><span class="unit-chip">ADC</span></div><div class="chart-wrap"><canvas id="dsLdrChart"></canvas></div></article>
+            </div>
+            <article class="panel correlation-panel"><div class="panel-header"><div><h3>Summary table</h3><p>One row per sensor</p></div></div><div class="ds-table-wrap" id="dsTable"></div></article>
+            <p class="fine-print ds-note">Each reading is compared with this run's own starting level, so the analysis shows how much the readings changed. It is not a validated spoilage test, and the MQ-135 gives raw values, not gas concentrations.</p>
+          </div>
         </section>
 
                 <section class="page-section" id="banana">
