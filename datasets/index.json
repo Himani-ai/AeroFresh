@@ -3,5 +3,15 @@
     "name": "Milk run 1",
     "file": "datasets/milk_run_1.csv",
     "rows": 3384
+  },
+  {
+    "name": "milk run 2",
+    "file": "datasets/milk_run_2.csv",
+    "rows": 16
+  },
+  {
+    "name": "milk run 3",
+    "file": "datasets/milk_run_3.csv",
+    "rows": 8
   }
 ]

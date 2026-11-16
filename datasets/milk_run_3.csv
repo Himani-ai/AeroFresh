@@ -1,0 +1,9 @@
+received_at_utc,device_timestamp,device_id,label,temperature,humidity,gas_adc,ldr_adc,door_state,lid_open_count,lid_duration_seconds
+2026-11-16T21:38:33+00:00,2026-11-16T21:38:33Z,aerofresh-esp32-01,milk run 3,26.6,58.5,1665,4034,closed,3,5
+2026-11-16T21:38:35+00:00,2026-11-16T21:38:35Z,aerofresh-esp32-01,milk run 3,26.6,58.5,1680,4095,closed,3,5
+2026-11-16T21:38:38+00:00,2026-11-16T21:38:38Z,aerofresh-esp32-01,milk run 3,26.6,58.7,1677,4095,closed,3,5
+2026-11-16T21:38:40+00:00,2026-11-16T21:38:40Z,aerofresh-esp32-01,milk run 3,26.6,58.6,1687,4095,closed,3,5
+2026-11-16T21:38:43+00:00,2026-11-16T21:38:43Z,aerofresh-esp32-01,milk run 3,26.6,58.6,1684,4095,closed,3,5
+2026-11-16T21:38:45+00:00,2026-11-16T21:38:45Z,aerofresh-esp32-01,milk run 3,26.6,58.7,1682,4095,closed,3,5
+2026-11-16T21:38:48+00:00,2026-11-16T21:38:48Z,aerofresh-esp32-01,milk run 3,26.6,58.7,1673,4095,closed,3,5
+2026-11-16T21:38:50+00:00,2026-11-16T21:38:50Z,aerofresh-esp32-01,milk run 3,26.6,58.6,1683,4095,closed,3,5
