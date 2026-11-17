@@ -13,5 +13,10 @@
     "name": "milk run 3",
     "file": "datasets/milk_run_3.csv",
     "rows": 8
+  },
+  {
+    "name": "milk run 4",
+    "file": "datasets/milk_run_4.csv",
+    "rows": 9939
   }
 ]
